@@ -26,3 +26,12 @@ def get_assessments(course_code: str, semester: ge.Semester=ge.Semester.SEM1, ye
         return jsonify(table), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
+
+@api.route('/test/<string:url>', methods=['GET'])
+def get_website_content(url: str) -> str:
+    """
+    Get the HTML content of a website.
+    """
+    base = f"https://learn.uq.edu.au/ultra/courses/{url}/grades"
+    extractor = ge.CourseExtractor(courses=[])
+    return extractor.open_website(base)

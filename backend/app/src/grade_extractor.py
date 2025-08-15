@@ -77,7 +77,7 @@ class CourseExtractor():
             rows.append([col.text.strip() for col in cols])
             
         df = pd.DataFrame(rows, columns=headers)
-        df = df.drop(columns=["Category", "Due date"])
+        df = df.drop(columns=["Due date"])
 
         # Edge case where weight = 0% and UQ left the weight 'blank'
         df = df.dropna()
@@ -95,7 +95,21 @@ class CourseExtractor():
         # Convert weightings
         df.loc[df['Weight'].str.contains("%"), ['Weight']] = df['Weight'].str.partition('%')[0]
         return df.to_dict(orient='records')
-        
+    
+    def open_website(self, site: str):
+        """
+        Open a website and return the HTML content.
+        """
+        headers = requests.utils.default_headers()
+        headers.update(
+            {
+                'User-Agent': 'My User Agent 1.0',
+            }
+        )
+        response = requests.get(site, headers=headers)
+        if response.status_code != 200:
+            raise ValueError(f"Failed to retrieve {site}")
+        return response.text
 
 
 if __name__ == "__main__":
