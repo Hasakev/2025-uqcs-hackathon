@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import Dashboard from './pages/Dashboard';
 import CreateBet from './pages/CreateBet';
+import BetHistory from './pages/BetHistory';
 import './index.css';
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/create-bet" element={<CreateBet />} />
+            <Route path="/history" element={<BetHistory />} />
           </Routes>
         </main>
       </div>
