@@ -92,9 +92,10 @@ class CourseExtractor():
             percentage = 100 / total_tasks
             df.loc[~df['Weight'].str.contains("%"), 'Weight'] = f"{percentage:.2f}%"
 
-        # Convert weightings to the appropriate format.
-        df.loc[df['Weight'].str.contains("%"), ['Weight']] = df['Weight'].str.partition('%')[0]  + "%"
-        return list(df.itertuples(index=False, name=None))
+        # Convert weightings
+        df.loc[df['Weight'].str.contains("%"), ['Weight']] = df['Weight'].str.partition('%')[0]
+        return df.to_dict(orient='records')
+        
 
 
 if __name__ == "__main__":

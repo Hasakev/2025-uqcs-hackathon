@@ -14,15 +14,15 @@ def health():
             }
             ), 200
 
-# @api.route('/courses/<string:course_code>/assessments', methods=['GET'])
-# def get_assessments(course_code: str, semester: ge.Semester, year: int):
-#     """
-#     Get assessments for a course.
-#     """
-#     extractor = ge.CourseExtractor(courses=[course_code])
-#     try:
-#         site = extractor.get_page(course_code, semester, year)
-#         table = extractor.get_table(site)
-#         return jsonify(table), 200
-#     except ValueError as e:
-#         return jsonify({"error": str(e)}), 404
+@api.route('/courses/<string:course_code>/assessments', methods=['GET'])
+def get_assessments(course_code: str, semester: ge.Semester=ge.Semester.SEM1, year: int=2025):
+    """
+    Get assessments for a course
+    """
+    extractor = ge.CourseExtractor(courses=[course_code])
+    try:
+        site = extractor.get_page(course_code, semester, year)
+        table = extractor.get_table(site)
+        return jsonify(table), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
