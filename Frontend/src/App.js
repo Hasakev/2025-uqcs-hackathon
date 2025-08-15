@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import Dashboard from './pages/Dashboard';
+import CreateBet from './pages/CreateBet';
 import './index.css';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/create-bet" element={<CreateBet />} />
           </Routes>
         </main>
       </div>
