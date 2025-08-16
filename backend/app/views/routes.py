@@ -17,6 +17,7 @@ from app.models.db import User, Bets, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
+from uuid import UUID as _UUID
 
 
 api = Blueprint('api', __name__)
@@ -152,14 +153,30 @@ def check_open_bets(username: str, bet_status: int):
     bets = q.all()
     return jsonify([Bets.to_json(b) for b in bets]), 200
 
-@api.route('/accept_open_bet/<string:username>/<string:bet_id>', methods=['GET'])
+@api.route('/accept_open_bet/<string:username>/<string:bet_id>', methods=['POST'])
 def accept_open_bet(username: str, bet_id: str):
-    bet = Bets.query.filter_by(uuid=bet_id, u2="NONE").first()
-    # update the bet status to BetsStatus.Accepted
-    if not bet:
-        return jsonify({"error": "Bet not found or already accepted"}), 404
-    bet.u2 = username
-    bet.status = BetStatus.Accepted
+    # 1) Validate + convert to uuid.UUID (matches your UUID/BINARY(16) column)
+    try:
+        bet_uuid = _UUID(bet_id)
+    except ValueError:
+        return jsonify({"error": "Invalid bet id"}), 400
+
+    # 2) Atomically claim the open, pending bet
+    rows = (db.session.query(Bets)
+            .filter(
+                Bets.uuid == bet_uuid,
+                Bets.u2 == "NONE",               # open bet = no opponent yet
+                Bets.status == BetStatus.Pending # only accept pending
+            )
+            .update(
+                {"u2": username, "status": BetStatus.Accepted},
+                synchronize_session=False
+            ))
+
+    if rows == 0:
+        db.session.rollback()
+        return jsonify({"error": "Bet not found, already accepted, or not pending"}), 409
+
     db.session.commit()
     return jsonify({"message": "Bet successfully accepted"}), 200
 
