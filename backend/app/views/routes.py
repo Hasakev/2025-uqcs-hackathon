@@ -129,13 +129,14 @@ def check_bets(username: str, bet_status: int):
     else:
         bets = Bets.query.filter_by(u1=username, status=bet_status).all()
         bets += Bets.query.filter_by(u2=username, status=bet_status).all()
-    return jsonify([bet.to_dict() for bet in bets]), 200
+    #print convert bets data to json format for sending
+    return jsonify([bet for bet in bets]), 200
 
 @api.route('/check_open_bets', methods=['GET'])
 def open_bets():
     bets = None
     bets = Bets.query.filter_by(status=BetStatus.Pending, u2=None).all()
-    return jsonify([bet.to_dict() for bet in bets]), 200
+    return jsonify([bet for bet in bets]), 200
 
 @api.route('/health')
 def health():
