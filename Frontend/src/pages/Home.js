@@ -11,6 +11,7 @@ const Home = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -28,7 +29,7 @@ const Home = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Basic validation
@@ -41,11 +42,47 @@ const Home = () => {
     }
     
     if (Object.keys(newErrors).length === 0) {
-      // Handle sign up logic here
-      console.log('Sign up data:', formData);
-
-      //naivgate to dahsboard after sign up
-      navigate('/Dashboard');
+      setIsSubmitting(true);
+      
+      try {
+        
+        const message = {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: formData.username,
+              email: formData.email,
+              password: formData.password,
+            })
+          }
+          console.log(message)
+          
+        const response = await fetch('https://4bv6rwmc-5000.auc1.devtunnels.ms/create_user', message);
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Success! Store user data and redirect
+          console.log('Sign up successful:', data);
+          
+          // Store token and user info in localStorage
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          
+          // Redirect to dashboard
+          navigate('/dashboard');
+        } else {
+          // API returned an error
+          alert(data.error || 'Sign up failed');
+        }
+      } catch (error) {
+        console.error('Network error:', error);
+        alert('Network error. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
       setErrors(newErrors);
     }
@@ -161,10 +198,11 @@ const Home = () => {
 
             <div>
               <button
-                type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Sign up
+                 type="submit"
+                 disabled={isSubmitting}
+                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+               >
+                 {isSubmitting ? 'Signing up...' : 'Sign up'}
               </button>
             </div>
           </form>

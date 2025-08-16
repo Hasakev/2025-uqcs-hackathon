@@ -5,26 +5,18 @@ import { ArrowLeft, BookOpen, Target, DollarSign, Calendar, Users, Eye, EyeOff, 
 const CreateBet = () => {
   const navigate = useNavigate();
   
-  // Mock data - replace with real data from your backend
-  const [courses] = useState([
-    'COMP3506 - Algorithms & Complexity',
-    'COMP3702 - Artificial Intelligence',
-    'COMP3400 - Computer Systems',
-    'COMP3500 - Programming Languages',
-    'COMP3600 - Design Computing Studio'
-  ]);
-
-  const [assessments] = useState([
-    'Assignment 1',
-    'Assignment 2',
-    'Assignment 3',
-    'Midterm Exam',
-    'Final Exam',
-    'Project'
-  ]);
+  const semesterOptions = [
+    { value: '1,24', label: 'Semester 1, 2024'},
+    { value: '2,24', label: 'Semester 2, 2024'},
+    { value: '3,24', label: 'Summer Semester, 2024'},
+    { value: '1,25', label: 'Semester 1, 2025'},
+    { value: '2,25', label: 'Semester 2, 2025'},
+    { value: '3,25', label: 'Summer Semester, 2025'}
+  ];
 
   const [formData, setFormData] = useState({
-    course: '',
+    courseCode: '', // Changed from 'course'
+    semester: '', // New field
     assessment: '',
     targetGrade: '',
     wagerAmount: '',
@@ -34,8 +26,13 @@ const CreateBet = () => {
     description: ''
   });
 
+  // Add these missing state variables
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Add state for API assessments
+  const [assessments, setAssessments] = useState([]);
+  const [isLoadingAssessments, setIsLoadingAssessments] = useState(false);
 
   const gradeOptions = [
     { value: 'HD', label: 'HD (85%+)', description: 'High Distinction' },
@@ -44,6 +41,27 @@ const CreateBet = () => {
     { value: 'P', label: 'P (50-64%)', description: 'Pass' },
     { value: 'F', label: 'F (<50%)', description: 'Fail' }
   ];
+
+
+  const fetchAssessments = async (courseCode, semester) => {
+    if (!courseCode || courseCode.length < 3 || !semester) return;
+    
+    // Parse semester format (e.g., "1,25" -> semester: 1, year: 2025)
+    const [sem, year] = semester.split(',');
+    const fullYear = `20${year}`;
+    
+    setIsLoadingAssessments(true);
+    try {
+      const response = await fetch(`https://4bv6rwmc-5000.auc1.devtunnels.ms/courses/CSSE2010/1/2025/assessments`);
+      const data = await response.json();
+      setAssessments(data);
+    } catch (error) {
+      console.error('Failed to fetch assessments:', error);
+      setAssessments([]);
+    } finally {
+      setIsLoadingAssessments(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -59,12 +77,20 @@ const CreateBet = () => {
         [name]: ''
       }));
     }
+    
+    // Fetch assessments when course code OR semester changes
+    if (name === 'courseCode' || name === 'semester') {
+      if (formData.courseCode && (name === 'semester' ? value : formData.semester)) {
+        fetchAssessments(formData.courseCode, name === 'semester' ? value : formData.semester);
+      }
+    }
   };
 
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.course) newErrors.course = 'Please select a course';
+    if (!formData.courseCode) newErrors.courseCode = 'Please enter a course code';
+    if (!formData.semester) newErrors.semester = 'Please select a semester';
     if (!formData.assessment) newErrors.assessment = 'Please select an assessment';
     if (!formData.targetGrade) newErrors.targetGrade = 'Please select a target grade';
     if (!formData.wagerAmount) {
@@ -142,35 +168,56 @@ const CreateBet = () => {
 
       {/* Bet Creation Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Course Selection */}
+        {/* Course & Semester Selection */}
         <div className="card">
           <div className="flex items-center space-x-3 mb-4">
             <BookOpen className="w-5 h-5 text-primary-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Course & Assessment</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Course & Semester</h2>
           </div>
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="course" className="block text-sm font-medium text-gray-700 mb-2">
-                Course *
+              <label htmlFor="courseCode" className="block text-sm font-medium text-gray-700 mb-2">
+                Course Code *
               </label>
-              <select
-                id="course"
-                name="course"
-                value={formData.course}
+              <input
+                type="text"
+                id="courseCode"
+                name="courseCode"
+                value={formData.courseCode}
                 onChange={handleInputChange}
-                className={`input-field ${errors.course ? 'border-danger-500' : ''}`}
-              >
-                <option value="">Select a course</option>
-                {courses.map((course, index) => (
-                  <option key={index} value={course}>{course}</option>
-                ))}
-              </select>
-              {errors.course && (
-                <p className="mt-1 text-sm text-danger-600">{errors.course}</p>
+                placeholder="e.g., COMP3506"
+                className={`input-field ${errors.courseCode ? 'border-danger-500' : ''}`}
+              />
+              {errors.courseCode && (
+                <p className="mt-1 text-sm text-danger-600">{errors.courseCode}</p>
               )}
             </div>
 
+            <div>
+              <label htmlFor="semester" className="block text-sm font-medium text-gray-700 mb-2">
+                Semester *
+              </label>
+              <select
+                id="semester"
+                name="semester"
+                value={formData.semester}
+                onChange={handleInputChange}
+                className={`input-field ${errors.semester ? 'border-danger-500' : ''}`}
+              >
+                <option value="">Select a semester</option>
+                {semesterOptions.map((semester) => (
+                  <option key={semester.value} value={semester.value}>
+                    {semester.label}
+                  </option>
+                ))}
+              </select>
+              {errors.semester && (
+                <p className="mt-1 text-sm text-danger-600">{errors.semester}</p>
+              )}
+            </div>
+
+            {/* Assessment Selection - Now populated from API */}
             <div>
               <label htmlFor="assessment" className="block text-sm font-medium text-gray-700 mb-2">
                 Assessment *
@@ -180,15 +227,28 @@ const CreateBet = () => {
                 name="assessment"
                 value={formData.assessment}
                 onChange={handleInputChange}
+                disabled={isLoadingAssessments || assessments.length === 0}
                 className={`input-field ${errors.assessment ? 'border-danger-500' : ''}`}
               >
-                <option value="">Select an assessment</option>
+                <option value="">
+                  {isLoadingAssessments 
+                    ? 'Loading assessments...' 
+                    : assessments.length === 0 
+                      ? 'Enter course code to see assessments' 
+                      : 'Select an assessment'
+                  }
+                </option>
                 {assessments.map((assessment, index) => (
-                  <option key={index} value={assessment}>{assessment}</option>
+                  <option key={index} value={assessment['Assessment task']}>
+                    {assessment['Assessment task']} ({assessment['Category']}) - {assessment['Weight']}%
+                  </option>
                 ))}
               </select>
               {errors.assessment && (
                 <p className="mt-1 text-sm text-danger-600">{errors.assessment}</p>
+              )}
+              {isLoadingAssessments && (
+                <p className="mt-1 text-xs text-gray-500">Loading assessments...</p>
               )}
             </div>
           </div>
