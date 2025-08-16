@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from operator import or_
 from app.models import db
 from app.src import session
 from flask import Blueprint, jsonify, request, make_response, redirect, current_app
@@ -58,6 +59,18 @@ def get_user(username: str):
         return jsonify({"error": "User not found"}), 404
     return jsonify({"username": user.username}), 200
 
+@api.route('/get_balance/<string:username>', methods=['GET'])
+def get_balance(username: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"balance": user.money}), 200
+
+@api.route('/get_users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    return jsonify([user.username for user in users]), 200
+
 @api.route('/check_user', methods=['POST'])
 def check_user():
     data = request.json
@@ -91,8 +104,8 @@ def create_bet():
         return jsonify({"error": "Missing required contents: User 1, User 2, Upper, Lower"}), 400
     bet = Bets(
         uuid = uuid.uuid4(),
-        u1=u1, 
-        u2=None, 
+        u1=u1,
+        u2=None if not u2 else u2, 
         type=BetType.Monetary, 
         status = BetStatus.Pending, 
         coursecode=coursecode, 
@@ -102,7 +115,7 @@ def create_bet():
     db.session.commit()
     return jsonify({"message": "Bet successfully added"}), 201
 
-@api.route('/accept_bet/<string:username>/<string:id>', methods=['GET'])
+@api.route('/accept_bet/<string:user>/<string:id>', methods=['GET'])
 def get_bet(user: str, id: str):
     try:
         uuid.UUID(id)
@@ -123,20 +136,32 @@ def get_bet(user: str, id: str):
 
 @api.route('/check_bets/<string:username>/<int:bet_status>', methods=['GET'])
 def check_bets(username: str, bet_status: int):
-    bets = None
-    if bet_status == 0:
-        bets = Bets.query.filter_by(u1=username).all()
-    else:
-        bets = Bets.query.filter_by(u1=username, status=bet_status).all()
-        bets += Bets.query.filter_by(u2=username, status=bet_status).all()
-    #print convert bets data to json format for sending
-    return jsonify([bet for bet in bets]), 200
+    q = Bets.query.filter(or_(Bets.u1 == username, Bets.u2 == username))
+    if bet_status != 0:
+        status_enum = BetStatus(bet_status)
+        q = q.filter(Bets.status == status_enum)
+    bets = q.all()
+    return jsonify([Bets.to_json(b) for b in bets]), 200
 
-@api.route('/check_open_bets', methods=['GET'])
-def open_bets():
-    bets = None
-    bets = Bets.query.filter_by(status=BetStatus.Pending, u2=None).all()
-    return jsonify([bet for bet in bets]), 200
+@api.route('/check_open_bets/<string:username>/<int:bet_status>', methods=['GET']) 
+def check_open_bets(username: str, bet_status: int):
+    q = Bets.query.filter(Bets.u1 != username, Bets.u2 == "NONE")
+    if bet_status != 0:
+        status_enum = BetStatus(bet_status)
+        q = q.filter(Bets.status == status_enum)
+    bets = q.all()
+    return jsonify([Bets.to_json(b) for b in bets]), 200
+
+@api.route('/accept_open_bet/<string:username>/<string:bet_id>', methods=['GET'])
+def accept_open_bet(username: str, bet_id: str):
+    bet = Bets.query.filter_by(uuid=bet_id, u2="NONE").first()
+    # update the bet status to BetsStatus.Accepted
+    if not bet:
+        return jsonify({"error": "Bet not found or already accepted"}), 404
+    bet.u2 = username
+    bet.status = BetStatus.Accepted
+    db.session.commit()
+    return jsonify({"message": "Bet successfully accepted"}), 200
 
 @api.route('/health')
 def health():

@@ -11,6 +11,7 @@ class User(db.Model):
     username = db.Column(db.String(80), primary_key=True)
     password = db.Column(db.String(80))
     email = db.Column(db.String(120), unique=True, nullable=False)
+    money = db.Column(db.Float(), default=1000)
 
     def to_json(self):
         """Converts the User object to a JSON-serializable dictionary."""
@@ -52,7 +53,7 @@ class Bets(db.Model):
         return {
             "uuid": str(self.uuid),
             "u1": self.u1,
-            "u2": self.u2,
+            "u2": self.u2 if self.u2 else None,
             "type": self.type.name if self.type else None,
             "status": self.status.name if self.status else None,
             "coursecode": self.coursecode,
