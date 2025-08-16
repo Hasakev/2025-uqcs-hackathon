@@ -14,6 +14,7 @@ import requests
 import base64, hashlib, os, secrets, urllib.parse as urlparse
 from app.models.db import User
 import time
+from http.cookies import SimpleCookie
 
 api = Blueprint('api', __name__)
 
@@ -23,7 +24,8 @@ print(os.environ)
 SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32))
 
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:5173")
-CORS(api, supports_credentials=True, origins=[WEB_ORIGIN])
+CORS(api) #removed security for dev purposes
+
 
 BB_BASE_URL = os.environ["BB_BASE_URL"].rstrip("/")
 BB_CLIENT_ID = os.environ["BB_CLIENT_ID"]
@@ -37,6 +39,7 @@ SESSION = SessionManager("data")
 @api.route('/create_user', methods=['POST'])
 def create_user():
     data = request.json
+    print(data)
     username = data.get("username")
     password = data.get("password")
     email = data.get("email")
@@ -76,11 +79,19 @@ def health():
             }
             ), 200
 
-@api.route('/courses/<string:course_code>/assessments', methods=['GET'])
-def get_assessments(course_code: str, semester: ge.Semester=ge.Semester.SEM1, year: int=2025):
+@api.route('/courses/<string:course_code>/<int:semester>/<int:year>/assessments', methods=['GET'])
+def get_assessments(course_code: str, semester: int, year: int=2025):
     """
     Get assessments for a course
     """
+    if semester == 1:
+        semester = ge.Semester.SEM1
+    elif semester == 2:
+        semester = ge.Semester.SEM2
+    elif semester == 3:
+        semester = ge.Semester.SUMMER
+    else:
+        return jsonify({"error": "Invalid semester"}), 400
     extractor = ge.CourseExtractor(courses=[course_code])
     try:
         site = extractor.get_page(course_code, semester, year)
@@ -195,6 +206,9 @@ def three_legged_login():
     )
     # print the cookie for debug
     print("Set-Cookie:", resp.headers.get("Set-Cookie"))
+    auth_cookie = SimpleCookie()
+    auth_cookie.load(resp.headers.get("Set-Cookie"))
+    print("Potential-Token:", auth_cookie["oauth_state"].value)
 
     params = {
         "response_type": "code",
@@ -335,3 +349,25 @@ def logout():
     resp = make_response(jsonify({"ok": True}))
     resp.delete_cookie("sid", path="/")
     return resp
+
+@api.route('/bet/<string:user_id>/<int:bet_status>', methods=['GET'])
+def get_pending_bets(user_id: str,bet_status: int):
+    """
+    Get pending bets
+    """
+    if semester == 1:
+        semester = ge.Semester.SEM1
+    elif semester == 2:
+        semester = ge.Semester.SEM2
+    elif semester == 3:
+        semester = ge.Semester.SUMMER
+    else:
+        return jsonify({"error": "Invalid semester"}), 400
+    
+    extractor = ge.CourseExtractor(courses=[course_code])
+    try:
+        site = extractor.get_page(course_code, semester, year)
+        table = extractor.get_table(site)
+        return jsonify(table), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
