@@ -17,6 +17,7 @@ from app.models.db import User, Bets, Courses, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
+import bs4
 
 
 api = Blueprint('api', __name__)
@@ -47,7 +48,7 @@ def create_user():
     email = data.get("email")
     if not username or not password or not email:
         return jsonify({"error": "Missing username, password or email"}), 400
-    user = User(username=username, password=password, email=email)
+    user = User(username=username, password=password, email=email,token = "", token_status = False)
     db.session.add(user)
     db.session.commit()
     return jsonify({"message": "User created successfully"}), 201
@@ -64,25 +65,65 @@ def token_status(username: str):
     user = User.query.filter_by(username=username).first()
     if not user:
         return jsonify({"error": "User not found"}), 404
-    return jsonify({"username": user.token_status}), 200
+    user.token_status = check_token_status(user.token)
+    db.session.commit()
+    return jsonify({"token status": user.token_status}), 200
 
 def check_token_status(token: str) -> bool:
     if not token:
         return False
-    BBsessionid = "expires:1755366777,id:EAD57E9B40DBA308687FF8A1CF2A370B,sessionId:2875487893,signature:a7ed9acd81cb080bd71bbdbe4cdd9575e1c31c8800791e9ac1988f548e756063,site:332f5b37-e3c3-43c4-8a0e-c1d71613da3d,timeout:10800,user:8eecbe69b7d4462ab7e76b170690e5df,v:2,xsrf:62e3b5bd-de48-48ac-8389-92be654e59ea"
-    cookie_string = "BbRouter="+BBsessionid+"; Path=/; Secure; HttpOnly;"
-    
+    cookie_string = "BbRouter="+token+"; Path=/; Secure; HttpOnly;"
+    # Parse the cookie string into a SimpleCookie object
+    cookie = SimpleCookie()
+    cookie.load(cookie_string)
+    # Convert SimpleCookie to a dictionary for requests
+    cookies_dict = {key: morsel.value for key, morsel in cookie.items()}
+
+    courseId = Courses.query.filter_by(course_code="CSSE2010").first().course_id
+    url = f"https://learn.uq.edu.au/webapps/bb-mygrades-BB5fd17f67f4120/myGrades?course_id={courseId}&stream_name=mygrades&is_stream=true"
+    response = requests.get(url, cookies=cookies_dict)
+    status_code = response.status_code
+    if status_code != 200:
+        return False
+
     return True
 
-@api.route('/update_token/<string:username>/<string:token>', methods=['GET'])
-def update_token(username: str,token: str):
-    user = User.query.filter_by(username=username).first()
+def grade_scrape_with_cookie(course_code: str, token: str) -> str:
+    """
+    Scrapes the course grades for a given student
+    Args:
+        url: The URL of the website to scrape.
+        cookie_string: The cookie string to set for the request.
+    Returns:
+        Json of grade data (with empties or pending removed)
+    """
+    try:
+        cookie_string = "BbRouter="+token+"; Path=/; Secure; HttpOnly;"
+        # Parse the cookie string into a SimpleCookie object
+        cookie = SimpleCookie()
+        cookie.load(cookie_string)
+        # Convert SimpleCookie to a dictionary for requests
+        cookies_dict = {key: morsel.value for key, morsel in cookie.items()}
+
+        url = f"https://learn.uq.edu.au/webapps/bb-mygrades-BB5fd17f67f4120/myGrades?course_id={course_code}&stream_name=mygrades&is_stream=true"
+        response = requests.get(url, cookies=cookies_dict)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        return response.text
+    except requests.exceptions.RequestException as e:
+        return f"Error scraping website: {e}"
+    except Exception as e:
+        return f"An unexpected error occurred: {e}"
+
+@api.route('/update_token/<string:user>/<string:token>', methods=['GET'])
+def update_token(user: str,token: str):
+    user = User.query.filter_by(username=user).first()
     if not user:
         return jsonify({"error": "User not found"}), 404
     user.token = token
+    user.token_status = check_token_status(token)
     db.session.commit()
-    
-    return jsonify({"username": user.token_status}), 200
+
+    return jsonify({"token addition": user.token_status}), 200
 
 @api.route('/add_course', methods=['POST'])
 def add_course():
