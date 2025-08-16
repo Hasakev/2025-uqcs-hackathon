@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from operator import or_
 from app.models import db
 from app.src import session
 from flask import Blueprint, jsonify, request, make_response, redirect, current_app
@@ -12,16 +13,17 @@ import os
 import secrets
 import requests
 import base64, hashlib, os, secrets, urllib.parse as urlparse
-from app.models.db import User, Bets, BetStatus, BetType
+from app.models.db import User, Bets, Courses, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
+from uuid import UUID as _UUID
+
 
 api = Blueprint('api', __name__)
 
 load_dotenv()
 
-print(os.environ)
 SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32))
 
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:5173")
@@ -58,6 +60,56 @@ def get_user(username: str):
         return jsonify({"error": "User not found"}), 404
     return jsonify({"username": user.username}), 200
 
+@api.route('/token_status/<string:username>', methods=['GET'])
+def token_status(username: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"username": user.token_status}), 200
+
+def check_token_status(token: str) -> bool:
+    if not token:
+        return False
+    BBsessionid = "expires:1755366777,id:EAD57E9B40DBA308687FF8A1CF2A370B,sessionId:2875487893,signature:a7ed9acd81cb080bd71bbdbe4cdd9575e1c31c8800791e9ac1988f548e756063,site:332f5b37-e3c3-43c4-8a0e-c1d71613da3d,timeout:10800,user:8eecbe69b7d4462ab7e76b170690e5df,v:2,xsrf:62e3b5bd-de48-48ac-8389-92be654e59ea"
+    cookie_string = "BbRouter="+BBsessionid+"; Path=/; Secure; HttpOnly;"
+    
+    return True
+
+@api.route('/update_token/<string:username>/<string:token>', methods=['GET'])
+def update_token(username: str,token: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user.token = token
+    db.session.commit()
+    
+    return jsonify({"username": user.token_status}), 200
+
+@api.route('/add_course', methods=['POST'])
+def add_course():
+    data = request.json
+    course_code = data.get("course_code")
+    course_id = data.get("course_id")
+    course_name = data.get("course_name")
+    if not course_id or not course_code:
+        return jsonify({"error": "Missing course code, course id"}), 400
+    course = Courses(course_code=course_code, course_id=course_id, course_name=course_name)
+    db.session.add(course)
+    db.session.commit()
+    return jsonify({"succesful addition": True}), 200
+
+@api.route('/get_balance/<string:username>', methods=['GET'])
+def get_balance(username: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"balance": user.money}), 200
+
+@api.route('/get_users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    return jsonify([user.username for user in users]), 200
+
 @api.route('/check_user', methods=['POST'])
 def check_user():
     data = request.json
@@ -89,12 +141,20 @@ def create_bet():
     if not u1 or not upper or not lower:
         print(u1, upper, lower)
         return jsonify({"error": "Missing required contents: User 1, User 2, Upper, Lower"}), 400
-    bet = Bets(uuid=uuid.uuid4(), u1=u1, u2=None, type=BetType.Monetary, status = BetStatus.Pending, coursecode=coursecode, year=year, semester=semester, assessment=assesment, upper=upper, lower=lower, wager1=wager1, wager2=wager1, description=description)
+    bet = Bets(
+        uuid = uuid.uuid4(),
+        u1=u1,
+        u2=None if not u2 else u2, 
+        type=BetType.Monetary, 
+        status = BetStatus.Pending, 
+        coursecode=coursecode, 
+        year=year, 
+        semester=semester, assessment=assesment, upper=upper, lower=lower, wager1=wager1, wager2=wager1, description=description)
     db.session.add(bet)
     db.session.commit()
     return jsonify({"message": "Bet successfully added"}), 201
 
-@api.route('/accept_bet/<string:username>/<string:id>', methods=['GET'])
+@api.route('/accept_bet/<string:user>/<string:id>', methods=['GET'])
 def get_bet(user: str, id: str):
     try:
         uuid.UUID(id)
@@ -115,19 +175,48 @@ def get_bet(user: str, id: str):
 
 @api.route('/check_bets/<string:username>/<int:bet_status>', methods=['GET'])
 def check_bets(username: str, bet_status: int):
-    bets = None
-    if bet_status == 0:
-        bets = Bets.query.filter_by(u1=username).all()
-    else:
-        bets = Bets.query.filter_by(u1=username, status=bet_status).all()
-        bets += Bets.query.filter_by(u2=username, status=bet_status).all()
-    return jsonify([bet.to_dict() for bet in bets]), 200
+    q = Bets.query.filter(or_(Bets.u1 == username, Bets.u2 == username))
+    if bet_status != 0:
+        status_enum = BetStatus(bet_status)
+        q = q.filter(Bets.status == status_enum)
+    bets = q.all()
+    return jsonify([Bets.to_json(b) for b in bets]), 200
 
-@api.route('/check_open_bets', methods=['GET'])
-def open_bets():
-    bets = None
-    bets = Bets.query.filter_by(status=BetStatus.Pending, u2=None).all()
-    return jsonify([bet.to_dict() for bet in bets]), 200
+@api.route('/check_open_bets/<string:username>/<int:bet_status>', methods=['GET']) 
+def check_open_bets(username: str, bet_status: int):
+    q = Bets.query.filter(Bets.u1 != username, Bets.u2 == "NONE")
+    if bet_status != 0:
+        status_enum = BetStatus(bet_status)
+        q = q.filter(Bets.status == status_enum)
+    bets = q.all()
+    return jsonify([Bets.to_json(b) for b in bets]), 200
+
+@api.route('/accept_open_bet/<string:username>/<string:bet_id>', methods=['POST'])
+def accept_open_bet(username: str, bet_id: str):
+    # 1) Validate + convert to uuid.UUID (matches your UUID/BINARY(16) column)
+    try:
+        bet_uuid = _UUID(bet_id)
+    except ValueError:
+        return jsonify({"error": "Invalid bet id"}), 400
+
+    # 2) Atomically claim the open, pending bet
+    rows = (db.session.query(Bets)
+            .filter(
+                Bets.uuid == bet_uuid,
+                Bets.u2 == "NONE",               # open bet = no opponent yet
+                Bets.status == BetStatus.Pending # only accept pending
+            )
+            .update(
+                {"u2": username, "status": BetStatus.Accepted},
+                synchronize_session=False
+            ))
+
+    if rows == 0:
+        db.session.rollback()
+        return jsonify({"error": "Bet not found, already accepted, or not pending"}), 409
+
+    db.session.commit()
+    return jsonify({"message": "Bet successfully accepted"}), 200
 
 @api.route('/health')
 def health():

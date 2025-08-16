@@ -2,6 +2,7 @@ from app.views.routes import BB_BASE_URL, BB_CLIENT_ID, BB_CLIENT_SECRET, BB_RED
 from flask import Flask
 from app.src.token_manager import TokenManager
 from app.models.db import db
+from app.views.proxy import proxy_bp
 
 def create_app() -> Flask:
     app = Flask(__name__)
@@ -12,6 +13,7 @@ def create_app() -> Flask:
         db.create_all()
         db.session.commit()
     app.register_blueprint(api)
+    app.register_blueprint(proxy_bp)
     app.config["SECRET_KEY"] = SECRET_KEY
     app.config["BB_BASE_URL"] = BB_BASE_URL
     app.config["BB_CLIENT_ID"] = BB_CLIENT_ID
