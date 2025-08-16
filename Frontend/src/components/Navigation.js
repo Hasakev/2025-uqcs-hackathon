@@ -1,12 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, PlusCircle, History, User } from 'lucide-react';
+import { Home, PlusCircle, History } from 'lucide-react'; // Remove User import
 
 const Navigation = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: Home },
+    { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/create-bet', label: 'Place Bet', icon: PlusCircle },
     { path: '/history', label: 'History & Grades', icon: History },
   ];
@@ -46,22 +46,7 @@ const Navigation = () => {
             })}
           </div>
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-4">
-            <button className="flex items-center space-x-2 text-gray-600 hover:text-primary-600 transition-colors duration-200">
-              <User className="w-5 h-5" />
-              <span className="hidden sm:block">Profile</span>
-            </button>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
-            <button className="text-gray-600 hover:text-primary-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
+          {/* Remove the User Menu section entirely */}
         </div>
 
         {/* Mobile Navigation */}
