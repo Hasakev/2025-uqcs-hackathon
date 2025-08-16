@@ -25,7 +25,7 @@ class BetStatus(enum.Enum):
 
 class Bets(db.Model):
     __tablename__ = "bets"
-    uuid = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
+    uuid = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4())
     u1 = db.Column(db.String(80))
     u2 = db.Column(db.String(80))
     type = db.Column(db.Enum(BetType))

@@ -89,7 +89,15 @@ def create_bet():
     if not u1 or not upper or not lower:
         print(u1, upper, lower)
         return jsonify({"error": "Missing required contents: User 1, User 2, Upper, Lower"}), 400
-    bet = Bets(uuid=uuid.uuid4(), u1=u1, u2=None, type=BetType.Monetary, status = BetStatus.Pending, coursecode=coursecode, year=year, semester=semester, assessment=assesment, upper=upper, lower=lower, wager1=wager1, wager2=wager1, description=description)
+    bet = Bets(
+        uuid = uuid.uuid4(),
+        u1=u1, 
+        u2=None, 
+        type=BetType.Monetary, 
+        status = BetStatus.Pending, 
+        coursecode=coursecode, 
+        year=year, 
+        semester=semester, assessment=assesment, upper=upper, lower=lower, wager1=wager1, wager2=wager1, description=description)
     db.session.add(bet)
     db.session.commit()
     return jsonify({"message": "Bet successfully added"}), 201
