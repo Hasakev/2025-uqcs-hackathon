@@ -46,7 +46,7 @@ const Navigation = () => {
             })}
           </div>
 
-          {/* Remove the User Menu section entirely */}
+        
         </div>
 
         {/* Mobile Navigation */}
