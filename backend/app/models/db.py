@@ -68,3 +68,9 @@ class Bets(db.Model):
             "wager2": self.wager2,
             "description": self.description,
         }
+    
+class Courses(db.Model):
+    __tablename__ = "courses"
+    course_code = db.Column(db.String(80), primary_key=True)
+    course_id = db.Column(db.String(80))
+    course_name = db.Column(db.Text())
