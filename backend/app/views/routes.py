@@ -13,7 +13,7 @@ import os
 import secrets
 import requests
 import base64, hashlib, os, secrets, urllib.parse as urlparse
-from app.models.db import User, Bets, BetStatus, BetType
+from app.models.db import User, Bets, Courses, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
@@ -59,6 +59,44 @@ def get_user(username: str):
     if not user:
         return jsonify({"error": "User not found"}), 404
     return jsonify({"username": user.username}), 200
+
+@api.route('/token_status/<string:username>', methods=['GET'])
+def token_status(username: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"username": user.token_status}), 200
+
+def check_token_status(token: str) -> bool:
+    if not token:
+        return False
+    BBsessionid = "expires:1755366777,id:EAD57E9B40DBA308687FF8A1CF2A370B,sessionId:2875487893,signature:a7ed9acd81cb080bd71bbdbe4cdd9575e1c31c8800791e9ac1988f548e756063,site:332f5b37-e3c3-43c4-8a0e-c1d71613da3d,timeout:10800,user:8eecbe69b7d4462ab7e76b170690e5df,v:2,xsrf:62e3b5bd-de48-48ac-8389-92be654e59ea"
+    cookie_string = "BbRouter="+BBsessionid+"; Path=/; Secure; HttpOnly;"
+    
+    return True
+
+@api.route('/update_token/<string:username>/<string:token>', methods=['GET'])
+def update_token(username: str,token: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user.token = token
+    db.session.commit()
+    
+    return jsonify({"username": user.token_status}), 200
+
+@api.route('/add_course', methods=['POST'])
+def add_course():
+    data = request.json
+    course_code = data.get("course_code")
+    course_id = data.get("course_id")
+    course_name = data.get("course_name")
+    if not course_id or not course_code:
+        return jsonify({"error": "Missing course code, course id"}), 400
+    course = Courses(course_code=course_code, course_id=course_id, course_name=course_name)
+    db.session.add(course)
+    db.session.commit()
+    return jsonify({"succesful addition": True}), 200
 
 @api.route('/get_balance/<string:username>', methods=['GET'])
 def get_balance(username: str):
