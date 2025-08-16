@@ -17,11 +17,11 @@ import time
 from http.cookies import SimpleCookie
 import uuid
 
+
 api = Blueprint('api', __name__)
 
 load_dotenv()
 
-print(os.environ)
 SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32))
 
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:5173")
