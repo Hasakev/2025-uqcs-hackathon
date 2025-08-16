@@ -45,6 +45,16 @@ const Home = () => {
       setIsSubmitting(true);
       
       try {
+        // ✅ STORE USER DATA IN LOCALSTORAGE BEFORE API CALL
+        const userData = {
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        };
+        
+        // Store in localStorage
+        localStorage.setItem('userData', JSON.stringify(userData));
+        console.log('User data stored locally:', userData);
         
         const message = {
             method: 'POST',
@@ -58,7 +68,7 @@ const Home = () => {
             })
           }
           console.log(message)
-          
+
         const response = await fetch('https://4bv6rwmc-5000.auc1.devtunnels.ms/create_user', message);
         
         const data = await response.json();
@@ -71,6 +81,11 @@ const Home = () => {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           
+          // Store token if API returns it
+          if (data.token) {
+            localStorage.setItem('token', data.token);
+            }
+
           // Redirect to dashboard
           navigate('/dashboard');
         } else {

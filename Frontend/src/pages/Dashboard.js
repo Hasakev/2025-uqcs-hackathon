@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PlusCircle, RefreshCw, TrendingUp, TrendingDown, DollarSign, Bell } from 'lucide-react';
 
 const Dashboard = () => {
+  // ✅ Get username and email from localStorage
+  const [userData, setUserData] = useState(null);
+  
+  useEffect(() => {
+    const storedData = localStorage.getItem('userData');
+    if (storedData) {
+      setUserData(JSON.parse(storedData));
+    }
+  }, []);
+
   // Mock data - replace with real data from your backend
   const [accountBalance] = useState(1250.75);
   const [pendingBets] = useState(3);

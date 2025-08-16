@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, Target, DollarSign, Calendar, Users, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
@@ -15,10 +15,13 @@ const CreateBet = () => {
   ];
 
   const [formData, setFormData] = useState({
+    user1:'',
+    type: 1,
     courseCode: '', // Changed from 'course'
     semester: '', // New field
     assessment: '',
     targetGrade: '',
+    lower: '',
     wagerAmount: '',
     expirationDate: '',
     isPublic: true,
@@ -33,6 +36,24 @@ const CreateBet = () => {
   // Add state for API assessments
   const [assessments, setAssessments] = useState([]);
   const [isLoadingAssessments, setIsLoadingAssessments] = useState(false);
+
+
+  // ✅ Auto-fill username from localStorage when component mounts
+  useEffect(() => {
+    const storedData = localStorage.getItem('userData');
+    if (storedData) {
+      const userData = JSON.parse(storedData);
+      if (userData.username) {
+        setFormData(prev => ({
+          ...prev,
+          user1: userData.username
+        }));
+        console.log('Username auto-filled:', userData.username);
+      }
+    }
+  }, []);
+
+
 
   const gradeOptions = [
     { value: 'HD', label: 'HD (85%+)', description: 'High Distinction' },
@@ -52,9 +73,25 @@ const CreateBet = () => {
     
     setIsLoadingAssessments(true);
     try {
-      const response = await fetch(`https://4bv6rwmc-5000.auc1.devtunnels.ms/courses/CSSE2010/1/2025/assessments`);
+      const url = `https://4bv6rwmc-5000.auc1.devtunnels.ms/courses/${courseCode}/${sem}/${fullYear}/assessments`;
+      console.log('Fetching assessments from:', url);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
-      setAssessments(data);
+      console.log('API Response:', data);
+      
+      if (Array.isArray(data)) {
+        setAssessments(data);
+        console.log('Assessments set successfully:', data.length, 'items');
+      } else {
+        console.error('API response is not an array:', data);
+        setAssessments([]);
+      }
     } catch (error) {
       console.error('Failed to fetch assessments:', error);
       setAssessments([]);
@@ -62,6 +99,7 @@ const CreateBet = () => {
       setIsLoadingAssessments(false);
     }
   };
+
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -78,21 +116,30 @@ const CreateBet = () => {
       }));
     }
     
-    // Fetch assessments when course code OR semester changes
     if (name === 'courseCode' || name === 'semester') {
-      if (formData.courseCode && (name === 'semester' ? value : formData.semester)) {
-        fetchAssessments(formData.courseCode, name === 'semester' ? value : formData.semester);
+      if (name === 'courseCode') {
+        // If course code changed, wait for semester to be selected
+        if (formData.semester) {
+          fetchAssessments(value, formData.semester);
+        }
+      } else if (name === 'semester') {
+        // If semester changed, check if course code exists
+        if (formData.courseCode) {
+          fetchAssessments(formData.courseCode, value);
+        }
       }
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-
+  
+    if (!formData.user1) newErrors.user1 = 'Please enter a username';
     if (!formData.courseCode) newErrors.courseCode = 'Please enter a course code';
     if (!formData.semester) newErrors.semester = 'Please select a semester';
     if (!formData.assessment) newErrors.assessment = 'Please select an assessment';
     if (!formData.targetGrade) newErrors.targetGrade = 'Please select a target grade';
+    if (!formData.lower) newErrors.lower = 'Please enter lower bound';
     if (!formData.wagerAmount) {
       newErrors.wagerAmount = 'Please enter a wager amount';
     } else if (parseFloat(formData.wagerAmount) < 5) {
@@ -100,29 +147,64 @@ const CreateBet = () => {
     } else if (parseFloat(formData.wagerAmount) > 500) {
       newErrors.wagerAmount = 'Maximum wager is $500.00';
     }
-    if (!formData.expirationDate) newErrors.expirationDate = 'Please select an expiration date';
-
+  
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form submitted');
     
     if (!validateForm()) {
+      console.log('validation failed');
       return;
     }
-
+    console.log('Validation passed, starting submission...');
     setIsSubmitting(true);
     
     try {
-      // Mock API call - replace with real API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Parse semester to get year
+      const [sem, year] = formData.semester.split(',');
+      const fullYear = `20${year}`;
       
-      // Show success message and redirect
-      alert('Bet created successfully!');
-      navigate('/');
+      // Prepare data in your exact format
+      const betData = {
+        u1: formData.user1,
+        u2: "NONE",
+        type: 'M',
+        coursecode: formData.courseCode,
+        year: fullYear,
+        semester: formData.semester,
+        assessment: formData.assessment,
+        upper: 100, // Always set to 100 for "above" type
+        lower: formData.lower,
+        wager1: formData.wagerAmount,
+        wager2: formData.wagerAmount,
+        description: formData.description
+      };
+
+      console.log('Submitting bet data:', betData);
+
+
+       // Send to your API
+       const response = await fetch('https://4bv6rwmc-5000.auc1.devtunnels.ms/create_bet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(betData)
+      });
+      
+      if (response.ok) {
+        alert('Bet created successfully!');
+        navigate('/dashboard');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to create bet');
+      }
     } catch (error) {
+      console.error('Error creating bet:', error);
       alert('Failed to create bet. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -168,6 +250,76 @@ const CreateBet = () => {
 
       {/* Bet Creation Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
+
+
+
+        {/* User & Bet Type Selection */}
+        <div className="card">
+          <div className="flex items-center space-x-3 mb-4">
+            <Users className="w-5 h-5 text-primary-600" />
+            <h2 className="text-lg font-semibold text-gray-900">User & Bet Type</h2>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="user1" className="block text-sm font-medium text-gray-700 mb-2">
+                Username *
+              </label>
+              <input
+                type="text"
+                id="user1"
+                name="user1"
+                value={formData.user1}
+                onChange={handleInputChange}
+                placeholder="Enter your username"
+                className={`input-field ${errors.user1 ? 'border-danger-500' : ''}`}
+              />
+              {errors.user1 && (
+                <p className="mt-1 text-sm text-danger-600">{errors.user1}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
+                Bet Type
+              </label>
+              <select
+                id="type"
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                className="input-field"
+              >
+                <option value="above">Above (Upper: 100)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">Currently only supports "above" type with upper bound of 100</p>
+            </div>
+
+            <div>
+              <label htmlFor="lower" className="block text-sm font-medium text-gray-700 mb-2">
+                Lower Bound *
+              </label>
+              <input
+                type="number"
+                id="lower"
+                name="lower"
+                value={formData.lower}
+                onChange={handleInputChange}
+                min="0"
+                max="99"
+                placeholder="Enter lower bound (0-99)"
+                className={`input-field ${errors.lower ? 'border-danger-500' : ''}`}
+              />
+              {errors.lower && (
+                <p className="mt-1 text-sm text-danger-600">{errors.lower}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">You're betting to score above this percentage</p>
+            </div>
+          </div>
+        </div>
+
+
+
         {/* Course & Semester Selection */}
         <div className="card">
           <div className="flex items-center space-x-3 mb-4">
@@ -250,6 +402,12 @@ const CreateBet = () => {
               {isLoadingAssessments && (
                 <p className="mt-1 text-xs text-gray-500">Loading assessments...</p>
               )}
+
+              {!isLoadingAssessments && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {Array.isArray(assessments) ? `${assessments.length} assessments found` : 'No assessments data'}
+                  </p>
+                )}
             </div>
           </div>
         </div>
@@ -312,28 +470,6 @@ const CreateBet = () => {
               <p className="mt-1 text-xs text-gray-500">Min: $5.00 | Max: $500.00</p>
             </div>
 
-            <div>
-              <label htmlFor="expirationDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Expiration Date *
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Calendar className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="date"
-                  id="expirationDate"
-                  name="expirationDate"
-                  value={formData.expirationDate}
-                  onChange={handleInputChange}
-                  min={getMinimumDate()}
-                  className={`input-field pl-10 ${errors.expirationDate ? 'border-danger-500' : ''}`}
-                />
-              </div>
-              {errors.expirationDate && (
-                <p className="mt-1 text-sm text-danger-600">{errors.expirationDate}</p>
-              )}
-            </div>
           </div>
         </div>
 
