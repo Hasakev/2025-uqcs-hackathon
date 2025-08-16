@@ -4,20 +4,42 @@ import Navigation from './components/Navigation';
 import Dashboard from './pages/Dashboard';
 import CreateBet from './pages/CreateBet';
 import BetHistory from './pages/BetHistory';
+import Home from './pages/Home';
 import './index.css';
 
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-        <Navigation />
-        <main className="container mx-auto px-4 py-8">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/create-bet" element={<CreateBet />} />
-            <Route path="/history" element={<BetHistory />} />
-          </Routes>
-        </main>
+        {/* Only show Navigation on pages other than Home */}
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/dashboard" element={
+            <>
+              <Navigation />
+              <main className="container mx-auto px-4 py-8">
+                <Dashboard />
+              </main>
+            </>
+          } />
+          <Route path="/create-bet" element={
+            <>
+              <Navigation />
+              <main className="container mx-auto px-4 py-8">
+                <CreateBet />
+              </main>
+            </>
+          } />
+          <Route path="/history" element={
+            <>
+              <Navigation />
+              <main className="container mx-auto px-4 py-8">
+                <BetHistory />
+              </main>
+            </>
+          } />
+        </Routes>
       </div>
     </Router>
   );

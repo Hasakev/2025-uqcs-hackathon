@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PlusCircle, RefreshCw, TrendingUp, TrendingDown, DollarSign, Bell } from 'lucide-react';
 
 const Dashboard = () => {
+  // ✅ Get username and email from localStorage
+  const [userData, setUserData] = useState(null);
+  
+  useEffect(() => {
+    const storedData = localStorage.getItem('userData');
+    if (storedData) {
+      setUserData(JSON.parse(storedData));
+    }
+  }, []);
+
   // Mock data - replace with real data from your backend
   const [accountBalance] = useState(1250.75);
-  const [totalWinnings] = useState(450.25);
+  const [pendingBets] = useState(3);
   const [activeBets] = useState([
     {
       id: 1,
@@ -72,15 +82,12 @@ const Dashboard = () => {
     }
   };
 
-  return (
+return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <button className="btn-primary flex items-center space-x-2">
-          <RefreshCw className="w-4 h-4" />
-          <span>Refresh Grades</span>
-        </button>
+        {/* Removed the Refresh Grades button */}
       </div>
 
       {/* Account Summary Cards */}
@@ -100,11 +107,11 @@ const Dashboard = () => {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Winnings</p>
-              <p className="text-2xl font-bold text-success-600">+${totalWinnings.toFixed(2)}</p>
+              <p className="text-sm font-medium text-gray-600">Pending Bets</p>
+              <p className="text-2xl font-bold text-warning-600">{pendingBets}</p>
             </div>
-            <div className="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-success-600" />
+            <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
+              <TrendingDown className="w-6 h-6 text-warning-600" />
             </div>
           </div>
         </div>
@@ -116,7 +123,7 @@ const Dashboard = () => {
               <p className="text-2xl font-bold text-gray-900">{activeBets.length}</p>
             </div>
             <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
-              <TrendingDown className="w-6 h-6 text-warning-600" />
+              <TrendingUp className="w-6 h-6 text-warning-600" />
             </div>
           </div>
         </div>
