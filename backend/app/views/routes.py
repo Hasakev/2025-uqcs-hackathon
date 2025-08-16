@@ -13,7 +13,7 @@ import os
 import secrets
 import requests
 import base64, hashlib, os, secrets, urllib.parse as urlparse
-from app.models.db import User, Bets, BetStatus, BetType
+from app.models.db import User, Bets, Courses, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
@@ -74,7 +74,6 @@ def check_token_status(token: str) -> bool:
     
     return True
 
-
 @api.route('/update_token/<string:username>/<string:token>', methods=['GET'])
 def update_token(username: str,token: str):
     user = User.query.filter_by(username=username).first()
@@ -84,6 +83,19 @@ def update_token(username: str,token: str):
     db.session.commit()
     
     return jsonify({"username": user.token_status}), 200
+
+@api.route('/add_course', methods=['POST'])
+def add_course():
+    data = request.json
+    course_code = data.get("course_code")
+    course_id = data.get("course_id")
+    course_name = data.get("course_name")
+    if not course_id or not course_code:
+        return jsonify({"error": "Missing course code, course id"}), 400
+    course = Courses(course_code=course_code, course_id=course_id, course_name=course_name)
+    db.session.add(course)
+    db.session.commit()
+    return jsonify({"succesful addition": True}), 200
 
 @api.route('/get_balance/<string:username>', methods=['GET'])
 def get_balance(username: str):
