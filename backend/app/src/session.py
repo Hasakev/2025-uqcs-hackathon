@@ -16,7 +16,6 @@ from bs4 import BeautifulSoup
 from cryptography.fernet import Fernet, InvalidToken
 from playwright.sync_api import sync_playwright, Browser, BrowserContext
 
-
 @dataclass
 class _LiveSession:
     session_id: str
