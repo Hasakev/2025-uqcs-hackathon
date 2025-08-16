@@ -103,26 +103,20 @@ def parse_grades_page(html_content):
     }
 
 if __name__ == '__main__':
-    # Set up command-line argument parsing
-    parser = argparse.ArgumentParser(
-        description='Parse a Blackboard grades HTML file and output JSON.'
-    )
-    parser.add_argument(
-        'file_path',
-        help='The path to the HTML file to parse.',
-        default='/Users/felixpountney/Desktop/Hackathon/2025-uqcs-hackathon/gambler/Blackboard_example_grade.htm',
-        nargs='?' # Makes the argument optional, using the default if not provided
-    )
-    args = parser.parse_args()
+    # Default file path if not provided via command line arguments
+    # In a real application, you might get this from user input or configuration
+    file_path = '/Users/felixpountney/Desktop/Hackathon/2025-uqcs-hackathon/gambler/Blackboard_example_grade.htm'
+    
+    
 
     try:
-        with open(args.file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
 
         grade_data = parse_grades_page(html_content)
         print(json.dumps(grade_data, indent=2))
 
-    except FileNotFoundError:
-        print(f"Error: The file was not found at {args.file_path}")
+    except FileNotFoundError: # type: ignore
+        print(f"Error: The file was not found at {file_path}")
     except Exception as e:
         print(f"An error occurred: {e}")
