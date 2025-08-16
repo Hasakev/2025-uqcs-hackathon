@@ -314,23 +314,7 @@ const CreateBet = () => {
           </div>
           
           <div className="space-y-4">
-            <div>
-              <label htmlFor="user1" className="block text-sm font-medium text-gray-700 mb-2">
-                Username *
-              </label>
-              <input
-                type="text"
-                id="user1"
-                name="user1"
-                value={formData.user1}
-                onChange={handleInputChange}
-                placeholder="Enter your username"
-                className={`input-field ${errors.user1 ? 'border-danger-500' : ''}`}
-              />
-              {errors.user1 && (
-                <p className="mt-1 text-sm text-danger-600">{errors.user1}</p>
-              )}
-            </div>
+
 
             <div>
               <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">

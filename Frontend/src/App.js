@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import CreateBet from './pages/CreateBet';
 import BetHistory from './pages/BetHistory';
 import Home from './pages/Home';
+import SignUp from './pages/SignUp';
+import Login from './pages/Login';
 import './index.css';
 
 function App() {
@@ -15,6 +17,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/login" element={<Login />} />w
           <Route path="/dashboard" element={
             <>
               <Navigation />
