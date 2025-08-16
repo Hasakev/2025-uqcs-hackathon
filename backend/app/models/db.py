@@ -12,6 +12,8 @@ class User(db.Model):
     password = db.Column(db.String(80))
     email = db.Column(db.String(120), unique=True, nullable=False)
     money = db.Column(db.Float(), default=1000)
+    token_status = db.Column(db.Boolean(), default=False)
+    token = db.Column(db.String(290))
 
     def to_json(self):
         """Converts the User object to a JSON-serializable dictionary."""
