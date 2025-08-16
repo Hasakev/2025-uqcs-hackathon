@@ -12,8 +12,10 @@ import os
 import secrets
 import requests
 import base64, hashlib, os, secrets, urllib.parse as urlparse
-from app.models.db import User
+from app.models.db import User, Bets, BetStatus, BetType
 import time
+from http.cookies import SimpleCookie
+import uuid
 
 api = Blueprint('api', __name__)
 
@@ -23,7 +25,8 @@ print(os.environ)
 SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32))
 
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:5173")
-CORS(api, supports_credentials=True, origins=[WEB_ORIGIN])
+CORS(api) #removed security for dev purposes
+
 
 BB_BASE_URL = os.environ["BB_BASE_URL"].rstrip("/")
 BB_CLIENT_ID = os.environ["BB_CLIENT_ID"]
@@ -37,6 +40,7 @@ SESSION = SessionManager("data")
 @api.route('/create_user', methods=['POST'])
 def create_user():
     data = request.json
+    print(data)
     username = data.get("username")
     password = data.get("password")
     email = data.get("email")
@@ -66,6 +70,65 @@ def check_user():
         return jsonify({"authenticated": False}), 200
     return jsonify({"authenticated": True}), 200
 
+@api.route('/create_bet', methods=['POST'])
+def create_bet():
+    data = request.json
+    u1 = data.get("u1")
+    u2 = data.get("u2")
+    type = data.get("type")
+    coursecode = data.get("coursecode")
+    year = data.get("year")
+    semester = data.get("semester")
+    assesment = data.get("assessment")
+    upper = data.get("upper")
+    lower = data.get("lower")
+    wager1 = data.get("wager1")
+    wager2 = data.get("wager2")
+    description = data.get("description")
+
+    if not u1 or not upper or not lower:
+        print(u1, upper, lower)
+        return jsonify({"error": "Missing required contents: User 1, User 2, Upper, Lower"}), 400
+    bet = Bets(uuid=uuid.uuid4(), u1=u1, u2=None, type=BetType.Monetary, status = BetStatus.Pending, coursecode=coursecode, year=year, semester=semester, assessment=assesment, upper=upper, lower=lower, wager1=wager1, wager2=wager1, description=description)
+    db.session.add(bet)
+    db.session.commit()
+    return jsonify({"message": "Bet successfully added"}), 201
+
+@api.route('/accept_bet/<string:username>/<string:id>', methods=['GET'])
+def get_bet(user: str, id: str):
+    try:
+        uuid.UUID(id)
+    except ValueError:
+        return jsonify({"error": "Invalid UUID"}), 400
+    
+    bet_id = uuid.UUID(id)
+    bet = Bets.query.filter_by(uuid=bet_id).first()
+    if not bet:
+        return jsonify({"error": "Bet not found"}), 404
+    if bet.u1 == user:
+        return jsonify({"error": "You cannot accept your own bet"}), 400
+    
+    bet.status = BetStatus.Accepted
+    bet.u1 = user
+    db.session.commit()
+    return jsonify({"message": "Bet successfully accepted"}), 200
+
+@api.route('/check_bets/<string:username>/<int:bet_status>', methods=['GET'])
+def check_bets(username: str, bet_status: int):
+    bets = None
+    if bet_status == 0:
+        bets = Bets.query.filter_by(u1=username).all()
+    else:
+        bets = Bets.query.filter_by(u1=username, status=bet_status).all()
+        bets += Bets.query.filter_by(u2=username, status=bet_status).all()
+    return jsonify([bet.to_dict() for bet in bets]), 200
+
+@api.route('/check_open_bets', methods=['GET'])
+def open_bets():
+    bets = None
+    bets = Bets.query.filter_by(status=BetStatus.Pending, u2=None).all()
+    return jsonify([bet.to_dict() for bet in bets]), 200
+
 @api.route('/health')
 def health():
     health = 200 ## Health should always be 200 for now, scalability not a concern
@@ -76,11 +139,19 @@ def health():
             }
             ), 200
 
-@api.route('/courses/<string:course_code>/assessments', methods=['GET'])
-def get_assessments(course_code: str, semester: ge.Semester=ge.Semester.SEM1, year: int=2025):
+@api.route('/courses/<string:course_code>/<int:semester>/<int:year>/assessments', methods=['GET'])
+def get_assessments(course_code: str, semester: int, year: int=2025):
     """
     Get assessments for a course
     """
+    if semester == 1:
+        semester = ge.Semester.SEM1
+    elif semester == 2:
+        semester = ge.Semester.SEM2
+    elif semester == 3:
+        semester = ge.Semester.SUMMER
+    else:
+        return jsonify({"error": "Invalid semester"}), 400
     extractor = ge.CourseExtractor(courses=[course_code])
     try:
         site = extractor.get_page(course_code, semester, year)
@@ -195,6 +266,9 @@ def three_legged_login():
     )
     # print the cookie for debug
     print("Set-Cookie:", resp.headers.get("Set-Cookie"))
+    auth_cookie = SimpleCookie()
+    auth_cookie.load(resp.headers.get("Set-Cookie"))
+    print("Potential-Token:", auth_cookie["oauth_state"].value)
 
     params = {
         "response_type": "code",
@@ -335,3 +409,25 @@ def logout():
     resp = make_response(jsonify({"ok": True}))
     resp.delete_cookie("sid", path="/")
     return resp
+
+@api.route('/bet/<string:user_id>/<int:bet_status>', methods=['GET'])
+def get_pending_bets(user_id: str,bet_status: int):
+    """
+    Get pending bets
+    """
+    if semester == 1:
+        semester = ge.Semester.SEM1
+    elif semester == 2:
+        semester = ge.Semester.SEM2
+    elif semester == 3:
+        semester = ge.Semester.SUMMER
+    else:
+        return jsonify({"error": "Invalid semester"}), 400
+    
+    extractor = ge.CourseExtractor(courses=[course_code])
+    try:
+        site = extractor.get_page(course_code, semester, year)
+        table = extractor.get_table(site)
+        return jsonify(table), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
