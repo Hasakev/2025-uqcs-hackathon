@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, Target, DollarSign, Calendar, Users, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { base_url } from '../components/config';
 
 const CreateBet = () => {
   const navigate = useNavigate();
@@ -29,6 +30,10 @@ const CreateBet = () => {
     description: ''
   });
 
+  const [allUsers, setAllUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+
   // Add these missing state variables
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +58,32 @@ const CreateBet = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setIsLoadingUsers(true);
+      try {
+        const response = await fetch(`${base_url}get_users`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+  
+        const storedData = localStorage.getItem('userData');
+        const myUsername = storedData ? JSON.parse(storedData).username : '';
+  
+        // Exclude current user
+        const filteredUsers = data.filter(user => user !== myUsername);
+        setAllUsers(filteredUsers);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        setAllUsers([]);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+  
+    fetchUsers();
+  }, []);
+  
+
 
 
   const gradeOptions = [
@@ -73,7 +104,7 @@ const CreateBet = () => {
     
     setIsLoadingAssessments(true);
     try {
-      const url = `https://4bv6rwmc-5000.auc1.devtunnels.ms/courses/${courseCode}/${sem}/${fullYear}/assessments`;
+      const url = `${base_url}courses/${courseCode}/${sem}/${fullYear}/assessments`;
       console.log('Fetching assessments from:', url);
       
       const response = await fetch(url);
@@ -107,7 +138,7 @@ const CreateBet = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+  
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -115,24 +146,38 @@ const CreateBet = () => {
         [name]: ''
       }));
     }
-    
+  
+    // Prevent entering your own username in invitedPeers if privacy is off
+    if (name === 'invitedPeers') {
+      const storedData = localStorage.getItem('userData');
+      const myUsername = storedData ? JSON.parse(storedData).username : '';
+      if (value.split(',').map(u => u.trim()).includes(myUsername)) {
+        setErrors(prev => ({
+          ...prev,
+          invitedPeers: "You cannot invite yourself!"
+        }));
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          invitedPeers: ''
+        }));
+      }
+    }
+  
     if (name === 'courseCode' || name === 'semester') {
       if (name === 'courseCode') {
-        // If course code changed, wait for semester to be selected
-        if (formData.semester) {
-          fetchAssessments(value, formData.semester);
-        }
+        if (formData.semester) fetchAssessments(value, formData.semester);
       } else if (name === 'semester') {
-        // If semester changed, check if course code exists
-        if (formData.courseCode) {
-          fetchAssessments(formData.courseCode, value);
-        }
+        if (formData.courseCode) fetchAssessments(formData.courseCode, value);
       }
     }
   };
+  
 
   const validateForm = () => {
     const newErrors = {};
+    const storedData = localStorage.getItem('userData');
+    const myUsername = storedData ? JSON.parse(storedData).username : '';
   
     if (!formData.user1) newErrors.user1 = 'Please enter a username';
     if (!formData.courseCode) newErrors.courseCode = 'Please enter a course code';
@@ -148,10 +193,18 @@ const CreateBet = () => {
       newErrors.wagerAmount = 'Maximum wager is $500.00';
     }
   
+    // Extra check for privacy
+    if (!formData.isPublic && formData.invitedPeers) {
+      const invitedUsers = formData.invitedPeers.split(',').map(u => u.trim());
+      if (invitedUsers.includes(myUsername)) {
+        newErrors.invitedPeers = "You cannot invite yourself!";
+      }
+    }
+  
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('Form submitted');
@@ -188,7 +241,7 @@ const CreateBet = () => {
 
 
        // Send to your API
-       const response = await fetch('https://4bv6rwmc-5000.auc1.devtunnels.ms/create_bet', {
+       const response = await fetch(`${base_url}create_bet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -479,6 +532,7 @@ const CreateBet = () => {
             <Users className="w-5 h-5 text-primary-600" />
             <h2 className="text-lg font-semibold text-gray-900">Privacy & Visibility</h2>
           </div>
+        </div>
           
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
@@ -496,26 +550,33 @@ const CreateBet = () => {
             </div>
 
             {!formData.isPublic && (
-              <div>
-                <label htmlFor="invitedPeers" className="block text-sm font-medium text-gray-700 mb-2">
-                  Invite Specific Peers (optional)
-                </label>
-                <input
-                  type="text"
-                  id="invitedPeers"
-                  name="invitedPeers"
-                  value={formData.invitedPeers}
-                  onChange={handleInputChange}
-                  placeholder="Enter usernames separated by commas"
-                  className="input-field"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Leave empty to make it private to yourself only
-                </p>
-              </div>
-            )}
+            <div>
+              <label htmlFor="invitedPeers" className="block text-sm font-medium text-gray-700 mb-2">
+                Invite Specific Peers
+              </label>
+              <select
+                id="invitedPeers"
+                name="invitedPeers"
+                value={formData.invitedPeers}
+                onChange={handleInputChange}
+                disabled={isLoadingUsers || allUsers.length === 0}
+                className={`input-field ${errors.invitedPeers ? 'border-danger-500' : ''}`}
+              >
+                <option value="">Select a user</option>
+                {allUsers.map(user => (
+                  <option key={user} value={user}>
+                    {user}
+                  </option>
+                ))}
+              </select>
+              {errors.invitedPeers && (
+                <p className="mt-1 text-sm text-danger-600">{errors.invitedPeers}</p>
+              )}
+              {isLoadingUsers && <p className="mt-1 text-xs text-gray-500">Loading users...</p>}
+            </div>)}
           </div>
-        </div>
+          
+
 
         {/* Description */}
         <div className="card">

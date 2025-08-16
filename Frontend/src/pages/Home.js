@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { base_url } from '../components/config';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ const Home = () => {
           }
           console.log(message)
 
-        const response = await fetch('https://4bv6rwmc-5000.auc1.devtunnels.ms/create_user', message);
+        const response = await fetch(`${ base_url }create_user`, message);
         
         const data = await response.json();
         

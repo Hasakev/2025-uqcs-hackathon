@@ -1,0 +1,1 @@
+export const base_url = "https://g6x5s2c9-5000.aue.devtunnels.ms/"
