@@ -1,13 +1,19 @@
+from dataclasses import dataclass
+from app.models import db
+from app.src import session
 from flask import Blueprint, jsonify, request, make_response, redirect, current_app
 from urllib.parse import urlencode, urljoin
 from flask_cors import CORS
 from datetime import datetime
 import app.src.grade_extractor as ge
-from app.src.session import main as session_main
+from app.src.session import main as session_main, SessionManager
 from dotenv import load_dotenv
 import os
 import secrets
 import requests
+import base64, hashlib, os, secrets, urllib.parse as urlparse
+from app.models.db import User
+import time
 
 api = Blueprint('api', __name__)
 
@@ -26,7 +32,39 @@ BB_REDIRECT_URI = os.environ.get("BB_REDIRECT_URI")
 
 COOKIE_KW = dict(httponly=True, secure=True, samesite="Lax", path="/")
 
+SESSION = SessionManager("data")
 
+@api.route('/create_user', methods=['POST'])
+def create_user():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+    email = data.get("email")
+    if not username or not password or not email:
+        return jsonify({"error": "Missing username, password or email"}), 400
+    user = User(username=username, password=password, email=email)
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({"message": "User created successfully"}), 201
+
+@api.route('/get_user/<string:username>', methods=['GET'])
+def get_user(username: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"username": user.username}), 200
+
+@api.route('/check_user', methods=['POST'])
+def check_user():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    user = User.query.filter_by(username=username, password=password).first()
+    if not user:
+        return jsonify({"authenticated": False}), 200
+    return jsonify({"authenticated": True}), 200
 
 @api.route('/health')
 def health():
@@ -52,28 +90,130 @@ def get_assessments(course_code: str, semester: ge.Semester=ge.Semester.SEM1, ye
         return jsonify({"error": str(e)}), 404
 
 
-@api.get("/auth/3lo/login")
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+def make_pkce():
+    verifier = _b64url(os.urandom(32))                    # 43–128 chars after b64url
+    challenge = _b64url(hashlib.sha256(verifier.encode()).digest())
+    return verifier, challenge
+
+
+@api.get("/test")
+def scrape():
+    website = "https://learn.uq.edu.au"
+    response = requests.get(website)
+    if response.status_code == 200:
+        return jsonify({"content": response.text}), 200
+    return jsonify({"error": "Failed to retrieve content"}), 500
+
+# @api.get("/auth/3lo/login")
+# def three_legged_login():
+#     cfg = current_app.config
+#     BB_BASE_URL = cfg["BB_BASE_URL"]
+#     BB_CLIENT_ID = cfg["BB_CLIENT_ID"]
+#     BB_REDIRECT_URI = cfg["BB_REDIRECT_URI"]
+#     if not BB_REDIRECT_URI:
+#         return "BB_REDIRECT_URI not set", 500
+#     verifier, challenge = make_pkce()
+#     # You can also persist a CSRF state in a short-lived cookie if desired
+#     state = f"xsrf_{secrets.token_urlsafe(8)}"
+#     mgr = current_app.extensions["bb_tokens"]
+#     # mgr.save_3lo(session_id, access)
+#     print(BB_CLIENT_ID)
+#     params = {
+#         "response_type": "code",
+#         "client_id": BB_CLIENT_ID,
+#         "redirect_uri": BB_REDIRECT_URI,
+#         "scope": "read",
+#         "state": state,
+#         "code_challenge": challenge,
+#         "code_challenge_method": "S256",
+#     }
+#     headers = {"Content-Type": "application/x-www-form-urlencoded", "Authorization": f"Bearer"}
+#     # save auth
+#     # include header
+#     auth_url = f"{BB_BASE_URL}/learn/api/public/v1/oauth2/authorizationcode?{urlencode(params)}"
+#     print(urlencode(params))
+#     resp = make_response(redirect(auth_url, code=302))
+#     return resp
+
+@dataclass
+class _Pending3LO:
+    verifier: str
+    created_at: float
+
+_PENDING: dict[str, _Pending3LO] = {}
+_PENDING_TTL = 600  # seconds
+
+
+def _make_pkce() -> tuple[str, str]:
+    verifier = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
+    digest = hashlib.sha256(verifier.encode()).digest()
+    challenge = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+    return verifier, challenge
+
+
+def _remember_state(state: str, verifier: str) -> None:
+    _PENDING[state] = _Pending3LO(verifier=verifier, created_at=time.time())
+
+
+def _pop_verifier(state: str) -> str | None:
+    rec = _PENDING.pop(state, None)
+    if not rec:
+        return None
+    if time.time() - rec.created_at > _PENDING_TTL:
+        return None
+    return rec.verifier
+
+@api.route("/auth/3lo/login", methods=["GET"])
 def three_legged_login():
     cfg = current_app.config
-    BB_BASE_URL = cfg["BB_BASE_URL"]
+    BB_BASE_URL = cfg["BB_BASE_URL"].rstrip("/")
     BB_CLIENT_ID = cfg["BB_CLIENT_ID"]
-    BB_REDIRECT_URI = cfg["BB_REDIRECT_URI"]
+    BB_REDIRECT_URI = cfg["BB_REDIRECT_URI"]  # MUST be this endpoint's URL (below)
+
     if not BB_REDIRECT_URI:
         return "BB_REDIRECT_URI not set", 500
 
-    # You can also persist a CSRF state in a short-lived cookie if desired
-    state = f"xsrf_{secrets.token_urlsafe(8)}"
-    print(BB_CLIENT_ID)
+    # PKCE + CSRF state
+    verifier, challenge = _make_pkce()
+    state = f"xsrf_{secrets.token_urlsafe(16)}"
+
+    _remember_state(state, verifier)
+
+    # (Optional) also set a short-lived state cookie for extra CSRF defense
+    resp = make_response()
+    resp.set_cookie(
+        "oauth_state",
+        state,
+        max_age=30000,
+        httponly=True,
+        secure=True,      # devtunnels is https; keep this True for prod
+        samesite="Lax",
+        path="/",
+    )
+    # print the cookie for debug
+    print("Set-Cookie:", resp.headers.get("Set-Cookie"))
+
     params = {
         "response_type": "code",
         "client_id": BB_CLIENT_ID,
         "redirect_uri": BB_REDIRECT_URI,
-        "scope": "read",
         "state": state,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+        # "scope": "read",  # Blackboard scopes are typically set at app level; include if required
     }
+
     auth_url = f"{BB_BASE_URL}/learn/api/public/v1/oauth2/authorizationcode?{urlencode(params)}"
-    resp = make_response(redirect(auth_url, code=302))
+    resp.headers["Location"] = auth_url
+    resp.status_code = 302
     return resp
+    # redirect again to callback
+    # request = make_request("GET", BB_REDIRECT_URI, params={"state": state, "code": code})
+    # return request
+
 
 @api.get("/auth/3lo/callback")
 def three_legged_callback():
@@ -86,12 +226,14 @@ def three_legged_callback():
     WEB_ORIGIN = cfg["WEB_ORIGIN"]
     code = request.args.get("code")
     state = request.args.get("state")
+    if not code or not state:
+        return jsonify(error="missing code/state"), 400
 
     # Optional: validate CSRF state
-    # if state != request.cookies.get("oauth_state"): return "Bad state", 400
+    if state != request.cookies.get("oauth_state"): return "Bad state", 400
 
     token_url = f"{BB_BASE_URL}/learn/api/public/v1/oauth2/token"
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    headers = {"Content-Type": "application/x-www-form-urlencoded", "Authorization": f"Bearer {code}"}
     body = {
         "grant_type": "client_credentials",
         "redirect_uri": cfg["BB_REDIRECT_URI"],
