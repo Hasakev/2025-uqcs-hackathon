@@ -1,0 +1,1 @@
+export const base_url = "https://4bv6rwmc-5000.auc1.devtunnels.ms/"
