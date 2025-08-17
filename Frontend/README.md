@@ -7,8 +7,9 @@ This is the frontend for the Blackboard Betting Platform, a web application that
 - User authentication (Sign Up, Login)
 - Dashboard to view and manage bets
 - Create new bets
-- View bet history
+- View bet history (in progress)
 - Responsive UI built with React and Tailwind CSS
+- Popup monitoring and webview popup components
 
 ## Project Structure
 
@@ -25,7 +26,9 @@ Frontend/
     ├── index.js
     ├── components/
     │   ├── config.js
-    │   └── Navigation.js
+    │   ├── Navigation.js
+    │   ├── PopupMonitor.js
+    │   └── WebviewPopup.js
     └── pages/
         ├── BetHistory.js
         ├── CreateBet.js
