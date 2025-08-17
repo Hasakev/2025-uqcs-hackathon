@@ -1,148 +1,71 @@
-# Modern Blackboard Scraper
+# Grade Gambit 
 
-A Python-based web scraper for extracting course information and grades from Blackboard Learn. This tool is designed to work with modern Blackboard installations and provides both automatic and manual login options.
+![Grade Gambit Logo](Gemini_Generated_Image_v91kdqv91kdqv91k.png)
+
+## Goals
+
+- **Bets to Promote Grade Success**: Only allows users to bet on the positive side of their own grades. This is to ensure only positive pressure to study.
+- **No Fights**: The system automates payouts and grade checking to stop any arguments around payment or validity of results. To further this goal we hold funds for non-monetary payouts as a packup in case a party pulls-out.
+- **For Laughs not Dollars**: We aim to include or add as many alternative betting types as possible to add to the keep the fun of a challenge amounts mates alive.
 
 ## Features
 
-- **Modern Selenium Implementation**: Uses current Selenium syntax and best practices
-- **Flexible Login**: Supports both automatic and manual login methods
-- **Course Discovery**: Automatically finds and navigates to available courses
-- **Grade Extraction**: Attempts to access and extract grade information
-- **Content Mapping**: Maps course structure and navigation elements
-- **Robust Error Handling**: Graceful fallbacks when automatic detection fails
-- **Data Export**: Saves all scraped data to JSON format
-- **Multiple Browser Support**: Works with Chrome and Firefox
+- **Verified Grade Results**: Using custom blackboard integration to verify results
+- **Public + Private Betting**: Supports both open market bets, as well as specific bet offers to friends
+- **Course Grade Checking**: Automatically finds and extracts courses grades to see updates live
+- **Multiple Betting Types**: Supports betting of both monetary and non-monetary amounts (slaps, text custom text to a friends ex)
+
+
+
+
+# Installation
 
 ## Prerequisites
 
 - Python 3.8 or higher
-- Chrome or Firefox browser installed
-- Appropriate WebDriver (ChromeDriver or GeckoDriver)
+- [Poetry](https://python-poetry.org/docs/#installation) for backend dependency management.
+- [Node.js](https://nodejs.org/en/download/) (which includes npm) for frontend dependency management.
+- A modern web browser like Chrome or Firefox.
 
-## Installation
+## Instructions
 
-1. Clone or download this repository
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+First, clone the repository to your local machine.
 
-3. Download the appropriate WebDriver:
-   - **Chrome**: Download [ChromeDriver](https://chromedriver.chromium.org/) and add to PATH
-   - **Firefox**: Download [GeckoDriver](https://github.com/mozilla/geckodriver/releases) and add to PATH
+### Backend (Poetry)
 
-## Usage
+1.  Navigate to the backend directory (assuming it's named `backend`):
+    ```bash
+    cd path/to/project/backend
+    ```
 
-### Basic Usage
+2.  Install the required Python packages using Poetry:
+    ```bash
+    poetry install
+    ```
 
-```bash
-python scrape.py "https://your-university.blackboard.com"
-```
+3.  Run the backend server. You may need to set up a `.env` file for environment variables first.
+    ```bash
+    poetry run flask --app app run --debug
+    ```
+    *(Note: This command might differ based on your project's entry point, e.g., `poetry run uvicorn...`)*
 
-### With Automatic Login
+### Frontend (npm)
 
-```bash
-python scrape.py "https://your-university.blackboard.com" --username "your_username" --password "your_password"
-```
+1.  In a **new terminal**, navigate to the frontend directory (assuming it's named `frontend`):
+    ```bash
+    cd path/to/project/frontend
+    ```
 
-### Advanced Options
+2.  Install the required node modules:
+    ```bash
+    npm install
+    ```
 
-```bash
-python scrape.py "https://your-university.blackboard.com" \
-    --username "your_username" \
-    --password "your_password" \
-    --browser chrome \
-    --headless \
-    --output "my_grades.json"
-```
-
-### Command Line Arguments
-
-- `url`: Blackboard base URL (required)
-- `--username`: Username for automatic login
-- `--password`: Password for automatic login
-- `--browser`: Browser to use (chrome or firefox, default: chrome)
-- `--headless`: Run in headless mode (no visible browser window)
-- `--output`: Output JSON filename (default: blackboard_data.json)
-
-## How It Works
-
-1. **Initialization**: Sets up the appropriate WebDriver with browser options
-2. **Login**: Attempts automatic login or falls back to manual login
-3. **Course Discovery**: Searches for available courses using multiple selector strategies
-4. **Content Mapping**: For each course, maps the navigation structure and content areas
-5. **Grade Access**: Attempts to navigate to and extract grade information
-6. **Data Export**: Saves all collected data to a JSON file
-
-## Output Format
-
-The scraper generates a JSON file with the following structure:
-
-```json
-{
-  "scraped_at": "2025-01-XX...",
-  "courses": [
-    {
-      "name": "Course Name",
-      "url": "course_url",
-      "content": {
-        "menu_items": [...],
-        "content_items": [...]
-      },
-      "grades": {
-        "grades": [...],
-        "page_title": "...",
-        "url": "..."
-      }
-    }
-  ],
-  "grades": {
-    "Course Name": {...}
-  }
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **WebDriver Not Found**: Ensure ChromeDriver/GeckoDriver is in your PATH
-2. **Login Fails**: Use manual login mode if automatic detection fails
-3. **No Courses Found**: The scraper will prompt you to navigate manually
-4. **Grades Not Accessible**: Some institutions restrict grade access
-
-### Manual Override
-
-If automatic detection fails, the scraper will prompt you to:
-- Log in manually
-- Navigate to course lists manually
-- Navigate to grades pages manually
-
-Simply follow the prompts and press Enter when ready to continue.
-
-## Security Notes
-
-- **Never commit credentials** to version control
-- **Use environment variables** for production deployments
-- **Respect rate limits** and be mindful of server load
-- **Check your institution's terms of service** regarding automated access
-
-## Legal and Ethical Considerations
-
-- This tool is for educational and personal use only
-- Respect your institution's terms of service
-- Do not use for commercial purposes
-- Be mindful of server load and rate limiting
-- Ensure you have permission to access the data you're scraping
-
-## Contributing
-
-Feel free to submit issues and enhancement requests. When contributing:
-
-1. Test with multiple Blackboard installations
-2. Add appropriate error handling
-3. Update documentation for any new features
-4. Follow existing code style and patterns
+3.  Start the frontend development server:
+    ```bash
+    npm start
+    ```
+    The application should now be accessible in your browser, typically at `http://localhost:3000`.
 
 ## License
 

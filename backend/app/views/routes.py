@@ -202,6 +202,19 @@ def course_check(username: str, course_code: str):
         return jsonify({"Course Grades Available": False}), 200
     return jsonify({"Course Grades Available": True}), 200
 
+@api.route('/grade_check/<string:username>/<string:course_code>', methods=['GET'])
+def grade_check(username: str, course_code: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_token_status(user.token):
+        return jsonify({"Course Grades Available": False}), 200
+    token = user.token
+    grades = grade_scrape_with_cookie(course_code, token)
+    if grades == {}:
+        return jsonify({"Course Grades Available": False}), 200
+    return jsonify({"Grades": grades}), 200
+
 @api.route('/update_token/<string:user>/<string:token>', methods=['GET'])
 def update_token(user: str,token: str):
     user = User.query.filter_by(username=user).first()
