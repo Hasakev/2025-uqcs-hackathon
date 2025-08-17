@@ -75,3 +75,9 @@ class Courses(db.Model):
     course_code = db.Column(db.String(80), primary_key=True)
     course_id = db.Column(db.String(80))
     course_name = db.Column(db.Text())
+    
+class AssignmentMap(db.Model):
+    __tablename__ = "assignmentMap"
+    uuid = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
+    ECP_name = db.Column(db.String(80))
+    Grade_name = db.Column(db.String(80))
