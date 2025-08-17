@@ -31,7 +31,8 @@ class BetStatus(enum.Enum):
     Pending = 1
     Accepted = 2
     Rejected = 3
-    Completed = 4
+    Win = 4
+    Loss = 5
 
 class Bets(db.Model):
     __tablename__ = "bets"
