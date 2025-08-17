@@ -279,6 +279,17 @@ const Dashboard = () => {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getBetStatusColor(bet.status)}`}>
                     {getBetStatusText(bet.status)}
                   </span>
+
+                  {/* ✅ Add Accept button for pending bets */}
+                  {bet.u1 !== userData?.username && bet.status === "Pending" && (
+                    <button
+                      onClick={() => acceptBet(bet.uuid)}
+                      className="btn-primary text-xs px-3 py-1"
+                    >
+                      Accept Bet
+                    </button>
+                  )}
+
                 </div>
               </div>
             ))}

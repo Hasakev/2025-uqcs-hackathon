@@ -87,8 +87,8 @@ const SignUp = () => {
             localStorage.setItem('token', data.token);
             }
 
-          // Redirect to dashboard
-          navigate('/dashboard');
+          // Redirect to Login
+          navigate('/Login');
         } else {
           // API returned an error
           alert(data.error || 'Sign up failed');

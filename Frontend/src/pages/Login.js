@@ -6,9 +6,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
-    confirmPassword: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -32,65 +30,58 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+  
     // Basic validation
     const newErrors = {};
     if (!formData.username) newErrors.username = 'Username is required';
-    if (!formData.email) newErrors.email = 'Email is required';
     if (!formData.password) newErrors.password = 'Password is required';
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
+  
     if (Object.keys(newErrors).length === 0) {
+      // ✅ Check against stored signup data
+      const storedUser = JSON.parse(localStorage.getItem('userData'));
+  
+      if (!storedUser) {
+        alert('No user found. Please sign up first.');
+        return;
+      }
+  
+      if (
+        formData.username !== storedUser.username ||
+        formData.password !== storedUser.password
+      ) {
+        alert('Invalid username or password');
+        return;
+      }
+  
       setIsSubmitting(true);
-      
+  
       try {
-        // ✅ STORE USER DATA IN LOCALSTORAGE BEFORE API CALL
-        const userData = {
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-        };
-        
-        // Store in localStorage
-        localStorage.setItem('userData', JSON.stringify(userData));
-        console.log('User data stored locally:', userData);
-        
+        // Proceed with API call (optional if backend also verifies)
         const message = {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              username: formData.username,
-              password: formData.password,
-            })
-          }
-          console.log(message)
-
-        const response = await fetch(`${ base_url }check_user`, message);
-        
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: formData.username,
+            password: formData.password,
+          }),
+        };
+  
+        const response = await fetch(`${base_url}check_user`, message);
         const data = await response.json();
-        
+  
         if (response.ok) {
-          // Success! Store user data and redirect
-          console.log('Sign up successful:', data);
-          
-          // Store token and user info in localStorage
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          
-          // Store token if API returns it
+          console.log('Login successful:', data);
+  
+          // Save token/user info
           if (data.token) {
             localStorage.setItem('token', data.token);
-            }
-
+          }
+          localStorage.setItem('user', JSON.stringify(data.user || storedUser));
+  
           // Redirect to dashboard
           navigate('/dashboard');
         } else {
-          // API returned an error
-          alert(data.error || 'Sign up failed');
+          alert(data.error || 'Login failed');
         }
       } catch (error) {
         console.error('Network error:', error);
@@ -102,6 +93,7 @@ const Login = () => {
       setErrors(newErrors);
     }
   };
+  
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

@@ -80,7 +80,14 @@ const CreateBet = () => {
       }
     };
   
+    // Call once immediately
     fetchUsers();
+  
+    // Set interval to refresh every 10 seconds
+    const interval = setInterval(fetchUsers, 10000);
+  
+    // Cleanup on unmount
+    return () => clearInterval(interval);
   }, []);
   
 
