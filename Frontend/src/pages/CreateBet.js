@@ -334,7 +334,8 @@ const CreateBet = () => {
                 onChange={handleInputChange}
                 className="input-field"
               >
-                <option value="above">Above (Upper: 100)</option>
+                <option value="above">Monetary ($)</option>
+                <option value="test">Slaps 😉</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">Currently only supports "above" type with upper bound of 100</p>
             </div>

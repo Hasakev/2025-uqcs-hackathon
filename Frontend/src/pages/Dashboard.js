@@ -12,13 +12,17 @@ const Dashboard = () => {
   const [openBets, setOpenBets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [token, setToken] = useState('');
+  const [tokenStatus, setTokenStatus] = useState("Not Connected")
+  const [queryResults, setQueryResults] = useState({ grades: [] });
+  const [courseCode, setCourseCode] = useState("");
   const fetchUserData = async () => {
         setIsLoading(true);
         try {
           const response = await fetch(`${base_url}get_user/${userData.username}`);
+          
           if (response.ok) {
             const data = await response.json();
-            setUserData(data);
             console.log('User data fetched:', data);
           } else {
             console.error('Failed to fetch user data');
@@ -30,6 +34,63 @@ const Dashboard = () => {
         }
       };
   
+  const runFelix = async (username, token) => {
+    try {
+      const response = await fetch(`${base_url}update_token/${username}/${token}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTokenStatus(data.token_status ? "Success" : "Failed");
+        console.log('Felix run successfully:', data);
+      } else {
+        console.error('Failed to run Felix');
+      }
+    } catch (error) {
+      console.error('Error running Felix:', error);
+    }
+  };
+
+  const fetchQueryResults = async (courseCode) => {
+    if (!userData?.username) return;
+    if (!courseCode) {
+      alert('Please enter a course code');
+      return;
+    }
+    // If tokenStatus must be “Success”, check for that explicitly
+    if (tokenStatus !== "Success") {
+      alert('Please connect your Blackboard');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const resp = await fetch(`${base_url}grade_check/${userData.username}/${courseCode}`);
+      if (!resp.ok) throw new Error('Failed to fetch query results');
+
+      const data = await resp.json();
+
+      // Normalize to { grades: [...] }
+      const grades =
+        Array.isArray(data?.grades) ? data.grades :
+        Array.isArray(data?.Grades?.grades) ? data.Grades.grades :
+        [];
+
+      // Optionally coerce grade to number or keep as string
+      const normalized = grades.map(g => ({
+        name: String(g.name ?? ''),
+        grade: g.grade != null ? String(g.grade) : '',
+      }));
+
+      setQueryResults({ grades: normalized });
+      console.log('Query results fetched:', normalized);
+    } catch (err) {
+      console.error('Error fetching query results:', err);
+      setQueryResults({ grades: [] });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   useEffect(() => {
     const storedData = localStorage.getItem('userData');
     if (storedData) {
@@ -57,16 +118,36 @@ const Dashboard = () => {
         }
       };
     fetchUserData();
-
+      
       //  Fetch user's bets and open bets when component mounts
       if (userData?.username) {
         console.log(userData.money);
         fetchUserBets(0); // 0 = all bets
         fetchOpenBets(0);
       }
+      fetchUserBets();
     }
-  }, [isRefreshing]);
+  }, [100]);
 
+  useEffect(() => {
+    const runFelix = async (username) => {
+      if (!username & isRefreshing) return;
+      try {
+        const response = await fetch(`${base_url}update_bets/${username}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Felix run successfully:', data);
+        } else {
+          console.error('Failed to run Felix');
+        }
+      } catch (error) {
+        console.error('Error running Felix:', error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+    runFelix(userData?.username);
+  }, [isRefreshing]);
   
 
   //  Fetch user's bets by status
@@ -262,7 +343,7 @@ const Dashboard = () => {
           <button 
             onClick={() => {
               if (userData?.username) {
-              
+                setIsRefreshing(true);
                 fetchUserBets(userData.username, 0);
                 fetchOpenBets(userData.username);
               }
@@ -270,12 +351,23 @@ const Dashboard = () => {
             className="flex items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors duration-200 group"
           >
             <div className="text-center">
-              <RefreshCw className="w-12 h-12 text-gray-400 group-hover:text-gray-500 mx-auto mb-3" />
-              <p className="text-lg font-medium text-gray-600 group-hover:text-gray-700">Refresh Data</p>
-              <p className="text-sm text-gray-500">Update your latest bets and open bets</p>
+              <h1 className="text-lg font-medium text-gray-600 group-hover:text-gray-700">Enter Blackboard Token</h1>
+              <input
+                type="text"
+                placeholder="Enter Token"
+                className="border border-gray-300 rounded-lg p-2"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                ></input>
+              <button onClick={() => runFelix(userData?.username, token)} className="mt-2 btn-primary">
+                Submit
+              </button>
+              <br></br>
+              <text className="text-sm text-gray-500">{tokenStatus}</text>
             </div>
           </button>
         </div>
+
       </div>
 
       {/* My Bets Section */}
@@ -320,7 +412,7 @@ const Dashboard = () => {
                     <h3 className="font-medium text-gray-900">{bet.coursecode}</h3>
                     <p className="text-sm text-gray-600">{bet.assessment}</p>
                     <div className="flex items-center space-x-4 mt-2 text-sm">
-                      <span className="text-gray-600">Target: <span className="font-medium">Above {bet.lower}%</span></span>
+                      <span className="text-gray-600">Target: <span className="font-medium">Monetary ($){bet.target}</span></span>
                       <span className="text-gray-600">Wager: <span className="font-medium">${bet.wager1}</span></span>
                       <span className="text-gray-600">Type: <span className="font-medium">{bet.type}</span></span>
                     </div>
@@ -396,6 +488,51 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {// add a new section of div that has an empty list to begin with, when you input a course code into a query, it will run a request that takes in the course code and username 
+
+      // It will then output the results as {'grades': [{'name': 'Final Exam', 'grade': '75.00'}, {'name': 'Assignment 2', 'grade': '16.60'}]}
+      }
+
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Course Query Results</h2>
+          <input
+            type="text"
+            placeholder="Enter course code"
+            value={courseCode}
+            onChange={(e) => setCourseCode(e.target.value)}
+            className="border border-gray-300 rounded-md p-2"
+          />
+          <button
+            onClick={() => fetchQueryResults(courseCode)}
+            className="ml-2 btn-primary"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Searching…' : 'Search'}
+          </button>
+        </div>
+
+        {/* show results if any search ran */}
+        {queryResults && (
+          <div className="mt-4">
+            <h3 className="text-lg font-semibold text-gray-900">Results:</h3>
+            {queryResults.grades.length === 0 ? (
+              <p className="text-gray-500">No grades found.</p>
+            ) : (
+              <ul className="list-disc list-inside">
+                {queryResults.grades.map((grade) => (
+                  <li key={grade.name} className="text-gray-700">
+                    {grade.name}: <span className="font-medium">{grade.grade}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+
     </div>
   );
 };

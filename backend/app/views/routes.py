@@ -211,7 +211,7 @@ def update_token(user: str,token: str):
     user.token_status = check_token_status(token)
     db.session.commit()
 
-    return jsonify({"token addition": user.token_status}), 200
+    return jsonify({"token_status": user.token_status}), 200
 
 @api.route('/add_course', methods=['POST'])
 def add_course():
@@ -425,6 +425,18 @@ def scrape():
         return jsonify({"content": response.text}), 200
     return jsonify({"error": "Failed to retrieve content"}), 500
 
+@api.route('/grade_check/<string:username>/<string:course_code>', methods=['GET'])
+def grade_check(username: str, course_code: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_token_status(user.token):
+        return jsonify({"Course Grades Available": False}), 200
+    token = user.token
+    grades = grade_scrape_with_cookie(course_code, token)
+    if grades == {}:
+        return jsonify({"Course Grades Available": False}), 200
+    return jsonify({"Grades": grades}), 200
 # @api.get("/auth/3lo/login")
 # def three_legged_login():
 #     cfg = current_app.config
@@ -678,3 +690,5 @@ def get_pending_bets(user_id: str,bet_status: int):
         return jsonify(table), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
+    
+    
