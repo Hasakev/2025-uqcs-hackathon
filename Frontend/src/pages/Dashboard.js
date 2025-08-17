@@ -11,6 +11,24 @@ const Dashboard = () => {
   const [userBets, setUserBets] = useState([]);
   const [openBets, setOpenBets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const fetchUserData = async () => {
+        setIsLoading(true);
+        try {
+          const response = await fetch(`${base_url}get_user/${userData.username}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data);
+            console.log('User data fetched:', data);
+          } else {
+            console.error('Failed to fetch user data');
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
   
   useEffect(() => {
     const storedData = localStorage.getItem('userData');
@@ -18,13 +36,38 @@ const Dashboard = () => {
       const parsedData = JSON.parse(storedData);
       setUserData(parsedData);
       
+
+      // try fetching the rest of data using API call
+      const fetchUserData = async () => {
+        setIsLoading(true);
+        if (!parsedData.username) return;
+        try {
+          const response = await fetch(`${base_url}get_user/${parsedData.username}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data);
+            console.log('User data fetched:', data);
+          } else {
+            console.error('Failed to fetch user data');
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+    fetchUserData();
+
       //  Fetch user's bets and open bets when component mounts
-      if (parsedData.username) {
+      if (userData?.username) {
+        console.log(userData.money);
         fetchUserBets(0); // 0 = all bets
         fetchOpenBets(0);
       }
     }
-  }, []);
+  }, [isRefreshing]);
+
+  
 
   //  Fetch user's bets by status
   // NEW
@@ -63,6 +106,10 @@ const Dashboard = () => {
     }
   };
 
+  const moneyFormatted = (money) => {
+    // format the money (which is a string) with commas
+    return "$" +  money.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
 
   //  Accept a bet
   const acceptBet = async (betId) => {
@@ -130,6 +177,7 @@ const Dashboard = () => {
             if (userData?.username) {
               fetchUserBets(userData.username, 0);
               fetchOpenBets(userData.username);
+              fetchUserData();
             }
           }}
           className="btn-primary flex items-center space-x-2"
@@ -163,7 +211,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Account Balance</p>
-              <p className="text-2xl font-bold text-gray-900">$1,250.75</p>
+              <p className="text-2xl font-bold text-gray-900">{isLoading ? 'Loading...' : (userData?.money ? moneyFormatted(userData.money) : '$0.00')}</p>
             </div>
             <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-primary-600" />
@@ -214,6 +262,7 @@ const Dashboard = () => {
           <button 
             onClick={() => {
               if (userData?.username) {
+              
                 fetchUserBets(userData.username, 0);
                 fetchOpenBets(userData.username);
               }

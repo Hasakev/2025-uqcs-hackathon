@@ -59,7 +59,7 @@ def get_user(username: str):
     user = User.query.filter_by(username=username).first()
     if not user:
         return jsonify({"error": "User not found"}), 404
-    return jsonify({"username": user.username}), 200
+    return jsonify(user.to_json()), 200
 
 @api.route('/token_status/<string:username>', methods=['GET'])
 def token_status(username: str):
@@ -207,6 +207,18 @@ def check_user():
         return jsonify({"authenticated": False}), 200
     return jsonify({"authenticated": True}), 200
 
+@api.route('/add_funds/<string:username>', methods=['POST'])
+def add_funds(username: str):
+    data = request.json
+    amount = data.get("amount", 0)
+    amount = float(amount)
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user.money += amount
+    db.session.commit()
+    return jsonify({"new_balance": user.money}), 200
+
 @api.route('/create_bet', methods=['POST'])
 def create_bet():
     data = request.json
@@ -258,6 +270,7 @@ def get_bet(user: str, id: str):
     db.session.commit()
     return jsonify({"message": "Bet successfully accepted"}), 200
 
+
 @api.route('/check_bets/<string:username>/<int:bet_status>', methods=['GET'])
 def check_bets(username: str, bet_status: int):
     q = Bets.query.filter(or_(Bets.u1 == username, Bets.u2 == username))
@@ -288,7 +301,6 @@ def accept_open_bet(username: str, bet_id: str):
     rows = (db.session.query(Bets)
             .filter(
                 Bets.uuid == bet_uuid,
-                Bets.u2 == "NONE",               # open bet = no opponent yet
                 Bets.status == BetStatus.Pending # only accept pending
             )
             .update(

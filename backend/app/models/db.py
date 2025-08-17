@@ -20,6 +20,9 @@ class User(db.Model):
         return {
             "username": self.username,
             "email": self.email,
+            "money": self.money,
+            "token_status": self.token_status,
+            "token": self.token
         }
 
 class BetType(enum.Enum):
