@@ -17,7 +17,7 @@ from app.models.db import User, Bets, Courses, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
-import bs4
+from bs4 import BeautifulSoup, NavigableString
 
 
 api = Blueprint('api', __name__)
@@ -108,11 +108,55 @@ def grade_scrape_with_cookie(course_code: str, token: str) -> str:
         url = f"https://learn.uq.edu.au/webapps/bb-mygrades-BB5fd17f67f4120/myGrades?course_id={course_code}&stream_name=mygrades&is_stream=true"
         response = requests.get(url, cookies=cookies_dict)
         response.raise_for_status()  # Raise an exception for bad status codes
+        if response.status_code != 200:
+            return {}
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        #check if user is allowwed to view grades for the course
+        main_body = soup.find('div', id='streamDetailMainBodyRight')
+        if not main_body:
+            return {}
+        
+        # Find the first element (could be text or tag)
+        for child in main_body.contents:
+            if isinstance(child, NavigableString):
+                if child.strip():  # non-empty text
+                    return {}
+                else:
+                    continue  # skip empty whitespace
+            else:
+                # First real element is a tag
+                grades_wrapper = soup.find('div', id='grades_wrapper')
+                if grades_wrapper:
+                    return {"grades": grades_wrapper.get_text(strip=True)}
+                else:
+                    return {}
+        
+        # If nothing meaningful was found
+        return {}
+
+
         return response.text
     except requests.exceptions.RequestException as e:
         return f"Error scraping website: {e}"
     except Exception as e:
         return f"An unexpected error occurred: {e}"
+    
+@api.route('/course_check/<string:username>/<string:course_code>', methods=['GET'])
+def course_check(username: str, course_code: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not check_token_status(user.token):
+        return jsonify({"Course Grades Available": False}), 200
+    print("tp1")
+    token = user.token
+    grades = grade_scrape_with_cookie(course_code, token)
+    print("tp2")
+    print(grades)
+    if grades == {}:
+        return jsonify({"Course Grades Available": False}), 200
+    return jsonify({"Course Grades Available": True}), 200
 
 @api.route('/update_token/<string:user>/<string:token>', methods=['GET'])
 def update_token(user: str,token: str):
