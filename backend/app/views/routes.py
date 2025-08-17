@@ -13,7 +13,7 @@ import os
 import secrets
 import requests
 import base64, hashlib, os, secrets, urllib.parse as urlparse
-from app.models.db import User, Bets, Courses, BetStatus, BetType
+from app.models.db import User, Bets, Courses, AssignmentMap, BetStatus, BetType
 import time
 from http.cookies import SimpleCookie
 import uuid
@@ -70,6 +70,42 @@ def token_status(username: str):
     db.session.commit()
     return jsonify({"token status": user.token_status}), 200
 
+@api.route('/update_bets/<string:username>', methods=['GET'])
+def update_bets(username: str):
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    token = user.token
+    if not check_token_status(token):
+        return jsonify({"error": "Blackboard token has expired. please update"}), 404
+    bets = Bets.query.filter_by(u1=username, status=BetStatus.Accepted).all()
+
+    updates = 0
+    for bet in bets:
+        course_code = bet.coursecode
+        data = grade_scrape_with_cookie(course_code, token)
+        if data == {}:
+            continue
+        target_name = AssignmentMap.query.filter_by(ECP_name=bet.assessment).first().Grade_name
+        grade = next((item['grade'] for item in data['grades'] if item['name'] == target_name), None)
+        if not grade:
+            continue
+        updates += 1
+        if bet.lower >= grade:
+            bet.status = BetStatus.Win
+            user.money += bet.wager1
+            u2 = User.query.filter_by(username=bet.u2).first()
+            u2.money -= bet.wager2
+        else:
+            bet.status = BetStatus.Loss
+            user.money -= bet.wager1
+            u2 = User.query.filter_by(username=bet.u2).first()
+            u2.money += bet.wager2
+        db.session.commit()
+    
+    db.session.commit()
+    return jsonify({"number of bets updated": updates}), 200
+
 def check_token_status(token: str) -> bool:
     if not token:
         return False
@@ -106,9 +142,9 @@ def grade_scrape_with_cookie(course_code: str, token: str) -> str:
         # Convert SimpleCookie to a dictionary for requests
         cookies_dict = {key: morsel.value for key, morsel in cookie.items()}
 
-        url = f"https://learn.uq.edu.au/webapps/bb-mygrades-BB5fd17f67f4120/myGrades?course_id={course_code}&stream_name=mygrades&is_stream=true"
+        courseId = Courses.query.filter_by(course_code=course_code).first().course_id
+        url = f"https://learn.uq.edu.au/webapps/bb-mygrades-BB5fd17f67f4120/myGrades?course_id={courseId}&stream_name=mygrades&is_stream=true"
         response = requests.get(url, cookies=cookies_dict)
-        response.raise_for_status()  # Raise an exception for bad status codes
         if response.status_code != 200:
             return {}
         soup = BeautifulSoup(response.text, "html.parser")
@@ -117,27 +153,36 @@ def grade_scrape_with_cookie(course_code: str, token: str) -> str:
         main_body = soup.find('div', id='streamDetailMainBodyRight')
         if not main_body:
             return {}
-        
         # Find the first element (could be text or tag)
         for child in main_body.contents:
-            if isinstance(child, NavigableString):
-                if child.strip():  # non-empty text
-                    return {}
-                else:
-                    continue  # skip empty whitespace
+            if not child.strip():
+                continue  # skip empty whitespace
+            if not "mygrades" in str(child):
+                # print(f"e0 : {child}")
+                return {}
             else:
-                # First real element is a tag
-                grades_wrapper = soup.find('div', id='grades_wrapper')
-                if grades_wrapper:
-                    return {"grades": grades_wrapper.get_text(strip=True)}
-                else:
-                    return {}
+                break
+
+        # First real element is a tag
+        grades_wrapper = soup.find('div', id='grades_wrapper')
+        if not grades_wrapper:
+            return {}
         
-        # If nothing meaningful was found
-        return {}
+        grades = []
+        rows = grades_wrapper.find_all('div', class_='graded_item_row')
+        for row in rows:
+            # Extract assessment name
+            name_span = row.select_one('.cell.gradable span')
+            name = name_span.get_text(strip=True) if name_span else None
 
+            # Extract grade
+            grade_span = row.select_one('.cell.grade span.grade')
+            grade = grade_span.get_text(strip=True) if grade_span else None
 
-        return response.text
+            if name and grade:
+                grades.append({"name": name, "grade": grade})
+
+        return {"grades": grades}
     except requests.exceptions.RequestException as e:
         return f"Error scraping website: {e}"
     except Exception as e:
@@ -150,10 +195,8 @@ def course_check(username: str, course_code: str):
         return jsonify({"error": "User not found"}), 404
     if not check_token_status(user.token):
         return jsonify({"Course Grades Available": False}), 200
-    print("tp1")
     token = user.token
     grades = grade_scrape_with_cookie(course_code, token)
-    print("tp2")
     print(grades)
     if grades == {}:
         return jsonify({"Course Grades Available": False}), 200
@@ -180,6 +223,18 @@ def add_course():
         return jsonify({"error": "Missing course code, course id"}), 400
     course = Courses(course_code=course_code, course_id=course_id, course_name=course_name)
     db.session.add(course)
+    db.session.commit()
+    return jsonify({"succesful addition": True}), 200
+
+@api.route('/add_assaignment_map', methods=['POST'])
+def add_assaignment_map():
+    data = request.json
+    ECP_name = data.get("ECP_name")
+    Grade_name = data.get("Grade_name")
+    if not ECP_name or not Grade_name:
+        return jsonify({"error": "Missing one of the names"}), 400
+    aMap = AssignmentMap(uuid = uuid.uuid4(), ECP_name=ECP_name, Grade_name=Grade_name)
+    db.session.add(aMap)
     db.session.commit()
     return jsonify({"succesful addition": True}), 200
 
@@ -246,7 +301,13 @@ def create_bet():
         status = BetStatus.Pending, 
         coursecode=coursecode, 
         year=year, 
-        semester=semester, assessment=assesment, upper=upper, lower=lower, wager1=wager1, wager2=wager1, description=description)
+        semester=semester, 
+        assessment=assesment, 
+        upper=upper, 
+        lower=lower, 
+        wager1=wager1, 
+        wager2=wager1, 
+        description=description)
     db.session.add(bet)
     db.session.commit()
     return jsonify({"message": "Bet successfully added"}), 201
